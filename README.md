@@ -29,7 +29,7 @@ copy .env.example .env             # set GEMINI_API_KEY and POSTGRES_PASSWORD
 docker compose up -d               # Postgres only
 cd backend
 python -m venv .venv
-.\.venv\Scripts\python -m pip install -r requirements.txt
+.\.venv\Scripts\python -m pip install -r requirements.txt   # tests: pip install -r requirements-dev.txt
 .\.venv\Scripts\python -m uvicorn app.main:app --port 8000
 # new terminal
 cd frontend; npm install; npm run dev     # open http://localhost:5173
