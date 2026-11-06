@@ -1,5 +1,7 @@
 # AI SEO Blog Agent (Appin Technology Coimbatore, practical assignment)
 
+**Live demo:** https://ai-seo-blog-agent.onrender.com (free Render instance: the first load after idle can take about a minute)  ·  **Blog pages it created:** https://ai-seo-blog-agent.onrender.com/blog
+
 One click on **Create Blog Page** runs an AI agent that researches keyword opportunities, checks them against the site's existing content, plans and writes an SEO-optimised article, validates it, and saves a real, server-rendered blog page in this test environment. **Nothing is ever written to appincoimbatore.com** (read-only GET requests, host allow-list).
 
 ```
