@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: ai-seo-blog-agent
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: LLM_MODEL
+        value: gemini-3.5-flash
+      - key: MAX_RUNS_PER_HOUR
+        value: "6"
+      - key: CORS_ORIGINS
+        value: https://ai-seo-blog-agent.onrender.com
