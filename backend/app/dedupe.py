@@ -27,6 +27,9 @@ def check(candidates: list[dict], existing: list[dict]) -> list[dict]:
         best, best_e, hits = 0.0, [], 0
         for e, et in index:
             score = len(ct & et) / len(ct) if ct else 0.0
+            # an existing page whose whole title is contained in the keyword already owns this topic
+            if len(et) >= 3 and et <= ct:
+                score = max(score, 0.85)
             if score >= 0.8:
                 hits += 1
             if score > best:
