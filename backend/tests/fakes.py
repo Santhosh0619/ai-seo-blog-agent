@@ -1,4 +1,5 @@
 """Deterministic fake LLM / research / images used ONLY by the automated tests (not part of the app)."""
+from app import errors
 from app.llm import current_key
 from app.models import (CTA, FAQ, BlogPost, ImageIdea, InternalLink, KeywordInsight, OutlineSection, Plan, Section, Seeds, SourceRef, Subsection)
 
@@ -81,7 +82,7 @@ def weak_post(plan: Plan) -> BlogPost:
     return p
 
 
-def fake_llm(weak_first: bool = False, seen_keys: list | None = None):
+def fake_llm(weak_first: bool = False, seen_keys: list | None = None, fail_repair: bool = False):
     state = {"plan": None}
 
     async def structured(schema, system, user, temperature=0.5, timeout=None):
@@ -98,6 +99,8 @@ def fake_llm(weak_first: bool = False, seen_keys: list | None = None):
         plan = state["plan"]
         has_links = "ALLOWED INTERNAL LINK URLS (data):\nnone" not in user
         if "FIXING" in system:
+            if fail_repair:
+                raise errors.UPSTREAM_ERROR
             return good_post(plan, has_links)
         return weak_post(plan) if weak_first else good_post(plan, has_links)
     return structured

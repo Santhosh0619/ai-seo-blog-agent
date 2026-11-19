@@ -72,39 +72,41 @@ export default function Landing() {
         <section className="hero">
           <div className="mesh" />
           <div className="container">
-            <span className="eyebrow fade-up"><i>New</i> An AI agent that researches, writes and scores SEO pages</span>
-            <h1 className="display fade-up">Turn any topic into a page <span className="grad-text">Google wants to read.</span></h1>
-            <p className="lead fade-up">Type a topic. The agent finds real keywords, avoids pages you already have, writes an original article with real images, and checks it against 22 SEO rules. Free to try.</p>
-            <form className="cmd fade-up" onSubmit={go}>
-              <Search className="lead-icon" size={20} />
-              <input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="Try: cricket bat for beginners" aria-label="Your topic" maxLength={120} />
-              <button className="btn btn-primary btn-lg" type="submit">Create blog page <ArrowRight size={18} /></button>
-            </form>
-            <div className="hero-note">
-              <span><BadgeCheck size={15} /> 2 free pages a day</span><span><ShieldCheck size={15} /> Your data stays private</span><span><KeyRound size={15} /> Or bring your own Gemini key</span>
-            </div>
-
-            <div className="demo">
-              <div className="card demo-card">
-                <div className="row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div className="hero-grid">
+              <div>
+                <span className="eyebrow fade-up"><i>New</i> An AI agent that researches, writes and scores SEO pages</span>
+                <h1 className="display fade-up">Turn any topic into a page <span className="grad-text">Google wants to read.</span></h1>
+                <p className="lead fade-up">Type a topic. The agent finds real keywords, avoids pages you already have, writes an original article with real images, and checks it against 22 SEO rules. Free to try.</p>
+                <form className="cmd fade-up" onSubmit={go}>
+                  <Search className="lead-icon" size={20} />
+                  <input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="Try: cricket bat for beginners" aria-label="Your topic" maxLength={120} />
+                  <button className="btn btn-primary btn-lg" type="submit">Create blog page <ArrowRight size={18} /></button>
+                </form>
+                <div className="hero-note">
+                  <span><BadgeCheck size={15} /> 2 free pages a day</span><span><ShieldCheck size={15} /> Your data stays private</span><span><KeyRound size={15} /> Or bring your own Gemini key</span>
+                </div>
+              </div>
+              <div className="card demo-card fade-up">
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <b>Agent at work</b><span className="badge brand"><Sparkles size={12} /> live</span>
                 </div>
                 <DemoSteps />
               </div>
-              <div style={{ display: "grid", gap: 22 }}>
-                <div className="card serp">
-                  <div className="faint" style={{ fontSize: 12, marginBottom: 8 }}>What searchers see</div>
-                  <div className="url">yoursite.com › cricket-bat-for-beginners</div>
-                  <div className="t">Cricket Bat for Beginners: A Practical Guide</div>
-                  <div className="d">Learn how to choose, size and care for your first bat. Clear advice, common mistakes and simple routines that help you start with confidence.</div>
-                </div>
-                <div className="card card-pad" style={{ display: "flex", gap: 20, alignItems: "center" }}>
-                  <ScoreRing score={94} size={92} />
-                  <div style={{ flex: 1 }}>
-                    <b>SEO score, with the reasons</b>
-                    <div className="muted" style={{ fontSize: 14, margin: "4px 0 10px" }}>Every failed check tells you why it matters and how to fix it.</div>
-                    <div className="chips"><span className="badge ok"><Check size={12} /> Title and meta</span><span className="badge ok"><Check size={12} /> FAQ schema</span><span className="badge est">Readability</span></div>
-                  </div>
+            </div>
+
+            <div className="demo">
+              <div className="card serp">
+                <div className="faint" style={{ fontSize: 12, marginBottom: 8 }}>What searchers see</div>
+                <div className="url">yoursite.com › cricket-bat-for-beginners</div>
+                <div className="t">Cricket Bat for Beginners: A Practical Guide</div>
+                <div className="d">Learn how to choose, size and care for your first bat. Clear advice, common mistakes and simple routines that help you start with confidence.</div>
+              </div>
+              <div className="card card-pad" style={{ display: "flex", gap: 20, alignItems: "center" }}>
+                <ScoreRing score={94} size={92} />
+                <div style={{ flex: 1 }}>
+                  <b>SEO score, with the reasons</b>
+                  <div className="muted" style={{ fontSize: 14, margin: "4px 0 10px" }}>Every failed check tells you why it matters and how to fix it.</div>
+                  <div className="chips"><span className="badge ok"><Check size={12} /> Title and meta</span><span className="badge ok"><Check size={12} /> FAQ schema</span><span className="badge est">Readability</span></div>
                 </div>
               </div>
             </div>

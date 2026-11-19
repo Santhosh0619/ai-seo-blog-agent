@@ -10,6 +10,10 @@ React (Vite) --SSE--> FastAPI --> LangGraph agent --> Gemini (structured output)
                          +--> Postgres: users, pages, images, runs        +--> /s/<token> share pages, downloads (HTML, zip, Markdown, JSON)
 ```
 
+## Screenshots
+![Landing page](docs/screenshots/landing.jpg)
+![A finished page with its SEO score and preview](docs/screenshots/result.jpg)
+
 ## What the agent does
 | Step | How | Data label |
 |---|---|---|

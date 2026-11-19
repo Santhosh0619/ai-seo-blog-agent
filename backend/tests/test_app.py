@@ -228,6 +228,18 @@ def test_repair_runs_once_and_improves_the_score(client, monkeypatch):
     _cleanup(client)
 
 
+def test_a_failed_repair_keeps_the_draft_instead_of_failing_the_run(client, monkeypatch):
+    monkeypatch.setattr(agent, "structured", fakes.fake_llm(weak_first=True, fail_repair=True))
+    _signup(client)
+    ev = _events(_create(client, site="https://example.com").text)
+    assert ev[-1][0] == "done", ev[-1]
+    done = ev[-1][1]
+    assert done["repaired"] is False and done["score_before"] is None and done["score"] < 85
+    note = [e[1]["data"]["note"] for e in ev if e[0] == "step" and e[1]["id"] == "repair" and e[1]["status"] == "done"]
+    assert note and "kept" in note[0]
+    _cleanup(client)
+
+
 def test_second_page_uses_a_different_keyword(client):
     _signup(client)
     a = _events(_create(client).text)[-1][1]

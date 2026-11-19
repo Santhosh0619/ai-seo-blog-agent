@@ -10,7 +10,7 @@ from typing import AsyncIterator, TypedDict
 from langgraph.graph import END, StateGraph
 
 from . import db, dedupe, images as images_mod, prompts, research, seo
-from .errors import AppError, map_exception
+from .errors import INVALID_API_KEY, MISSING_API_KEY, AppError, map_exception
 from .llm import structured
 from .models import BlogPost, BlogRequest, Plan, Seeds
 
@@ -39,6 +39,7 @@ class State(TypedDict, total=False):
     groups: dict
     score_before: int
     repaired: bool
+    repair_failed: bool
     result: dict
 
 
@@ -108,11 +109,17 @@ async def images_node(state: State) -> dict:
     return {"images": await images_mod.make_images(state["post"].images, state["req"].topic)}
 
 
+def _relevant_facts(state: State) -> bool:
+    """Reference text only counts as 'sources to cite' when it is about the chosen keyword."""
+    pt = dedupe.tokens(state["plan"].primary_keyword)
+    return any(pt & dedupe.tokens(f["title"] + " " + f["extract"][:400]) for f in state["facts"])
+
+
 def _ctx(state: State) -> seo.Ctx:
     req, plan = state["req"], state["plan"]
     facts_text = req.notes + " " + " ".join(f["extract"] for f in state["facts"])
     return seo.Ctx(primary=plan.primary_keyword, secondary=plan.secondary_keywords, facts_text=facts_text, prior_texts=state.get("prior_texts", []),
-                   link_pool=len(state["existing"]), sources_provided=bool(state["facts"]), word_min=max(800, int(req.word_target * 0.7)),
+                   link_pool=len(state["existing"]), sources_provided=_relevant_facts(state), word_min=max(800, int(req.word_target * 0.7)),
                    word_max=int(req.word_target * 1.8))
 
 
@@ -131,8 +138,15 @@ async def repair_node(state: State) -> dict:
     req, plan = state["req"], state["plan"]
     issues = [f"{c['label']} (currently: {c['detail'] or 'failed'}). Fix: {c['fix']}" for c in _failing(state)]
     links = _links(state)
-    post = await structured(BlogPost, prompts.repair_system(req, bool(links), bool(state["facts"])),
-                            prompts.repair_user(req, state["post"].model_dump(), plan.model_dump(), issues, state["facts"], links), temperature=0.4, timeout=100)
+    try:
+        post = await structured(BlogPost, prompts.repair_system(req, bool(links), bool(state["facts"])),
+                                prompts.repair_user(req, state["post"].model_dump(), plan.model_dump(), issues, state["facts"], links), temperature=0.4, timeout=100)
+    except AppError as err:
+        if err in (INVALID_API_KEY, MISSING_API_KEY):
+            raise
+        # A failed repair must never throw away a good draft: keep it and save it with its honest score.
+        log.warning("repair failed (%s); keeping the draft", err.code)
+        return {"repaired": True, "repair_failed": True}
     return {"post": post, "repaired": True}
 
 
@@ -141,7 +155,7 @@ async def save_node(state: State) -> dict:
     words = sum(len(p.split()) for p in seo.body_paragraphs(post))
     slug = await asyncio.to_thread(db.unique_slug, uid, post.slug)
     post.slug = slug
-    repaired = bool(state.get("repaired"))
+    repaired = bool(state.get("repaired")) and not state.get("repair_failed")
     research_blob = {"seeds": state["seeds"], "keyword_source": state["keyword_source"], "stats": state["stats"],
                      "site_note": state["site"]["note"], "facts": [{"title": f["title"], "url": f["url"]} for f in state["facts"]],
                      "candidates": [{k: c[k] for k in ("keyword", "status", "overlap", "verified", "source", "closest")} for c in state["candidates"][:40]],
@@ -205,6 +219,8 @@ def summarize(node: str, upd: dict, state: dict) -> dict:
     if node == "validate":
         return {"checks": upd["checks"], "score": upd["score"], "groups": upd["groups"], "repaired": bool(state.get("repaired")), "score_before": state.get("score_before")}
     if node == "repair":
+        if upd.get("repair_failed"):
+            return {"note": "The repair step could not run (the AI service was busy), so your draft was kept as it is."}
         return {"note": "One targeted repair pass was applied for the failed checks."}
     return upd["result"]
 
