@@ -15,6 +15,7 @@ import Result from "./pages/Result";
 import History from "./pages/History";
 import Account from "./pages/Account";
 import NotFound from "./pages/NotFound";
+import Privacy from "./pages/Privacy";
 import "./styles.css";
 
 // The free host sleeps when idle: show a friendly screen while it wakes up (about a minute).
@@ -53,6 +54,7 @@ createRoot(document.getElementById("root")).render(
                 <Route path="/" element={<Landing />} />
                 <Route path="/login" element={<Auth mode="login" />} />
                 <Route path="/signup" element={<Auth mode="signup" />} />
+                <Route path="/privacy" element={<Privacy />} />
                 <Route path="/app" element={<Shell />}>
                   <Route index element={<Navigate to="new" replace />} />
                   <Route path="new" element={<NewBlog />} />

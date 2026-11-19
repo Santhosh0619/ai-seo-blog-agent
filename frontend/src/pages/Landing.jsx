@@ -180,7 +180,7 @@ export default function Landing() {
         </section>
       </main>
 
-      <footer className="site"><div className="container row"><span>{PRODUCT}: an AI SEO blog agent. Built with FastAPI, LangGraph and Gemini.</span><span><FileDown size={14} style={{ verticalAlign: -2 }} /> Your pages are yours to download.</span></div></footer>
+      <footer className="site"><div className="container row"><span>{PRODUCT}: an AI SEO blog agent. Built with FastAPI, LangGraph and Gemini.</span><span><FileDown size={14} style={{ verticalAlign: -2 }} /> Your pages are yours to download. · <Link to="/privacy">Privacy</Link></span></div></footer>
     </>
   );
 }

@@ -60,7 +60,7 @@ export default function Auth({ mode }) {
         <p className="muted" style={{ marginTop: 20, fontSize: 14 }}>
           {signup ? <>Already have an account? <Link to={`/login${topic ? `?topic=${encodeURIComponent(topic)}` : ""}`}>Sign in</Link></> : <>New here? <Link to={`/signup${topic ? `?topic=${encodeURIComponent(topic)}` : ""}`}>Create an account</Link></>}
         </p>
-        {signup && <p className="hint" style={{ marginTop: 14 }}>We store your email, your pages and your run history. We never store your Gemini key. You can export or delete everything from your account page.</p>}
+        {signup && <p className="hint" style={{ marginTop: 14 }}>We store your email, your pages and your run history. We never store your Gemini key. You can export or delete everything from your account page. <Link to="/privacy">Privacy</Link></p>}
       </div>
       <aside className="auth-art" aria-hidden="true">
         <div className="art-card">
