@@ -148,7 +148,7 @@ def check(post: BlogPost, ctx: Ctx) -> tuple[list[dict], int, dict]:
          "The H1 is the page headline. Google reads it as the main topic.", "Put the primary keyword naturally in the H1."),
         ("first100", "onpage", "Primary keyword appears in the first 100 words", p in first100, "", True,
          "Saying the topic early shows readers and Google that the page answers the search.", "Mention the main keyword naturally in the first paragraph."),
-        ("density", "onpage", "Primary keyword density is 0.3-3% (not stuffed)", 0.3 <= density <= 3.0, f"{density:.2f}% ({occ} uses)", True,
+        ("density", "onpage", "Primary keyword density is 0.5-2.5% (not stuffed)", 0.5 <= density <= 2.5, f"{density:.2f}% ({occ} uses)", True,
          "Too few mentions is unclear; too many looks like keyword stuffing.", "Use the keyword naturally 5 to 8 times, and use related phrases elsewhere."),
         ("structure", "onpage", "At least 4 H2 sections, none empty", len(post.sections) >= 4 and empty_h2 == 0, f"{len(post.sections)} H2, {empty_h2} empty", True,
          "Clear headings make the page easy to scan and give Google its structure.", "Add or fill H2 sections so every heading has content."),
