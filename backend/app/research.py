@@ -1,107 +1,134 @@
-"""Keyword research + site inventory. READ-ONLY: only GET requests, only to allow-listed hosts.
+"""Keyword research for any topic. READ-ONLY: only GET requests.
 
 Data labels:
-  verified  = observed directly (live Google Autocomplete, live site sitemap, or the dated snapshot
-              of those same sources captured during manual browser research)
+  verified  = observed directly (live Google Autocomplete suggestions, the user's real sitemap, Wikipedia text)
   estimate  = added later by the AI step (intent / competition / volume bands)
 """
 import asyncio
 import json
 import re
-import time
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 import httpx
 
-from .config import DATA_DIR, SEEDS, SITE, SITE_HOST
+from . import safeurl
+from .models import BlogRequest
 
-UA = "Mozilla/5.0 (compatible; AppinSEOAgentDemo/1.0)"
-SUGGEST = "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=in&q="
-ALLOWED_HOSTS = {SITE_HOST, "suggestqueries.google.com"}
-_SKIP = re.compile(r"thank-you|register|download-|digital-card|maintenance|author|course-enquiry|-dinesh|-kousalya|/fb/")
-_TOPIC = re.compile(r"digital-marketing|seo|social-media|marketing|ppc|google-ads|content|influencer|branding|email")
-_RELEVANT = re.compile(r"marketing|seo|ads|social media|content|analytics|ppc|affiliate|email|course|training|syllabus|career|institute", re.I)
-_OTHER_CITY = re.compile(r"\b(chennai|bangalore|bengaluru|kolkata|hyderabad|mumbai|delhi|pune|kerala|kochi)\b", re.I)
-_NOISE = re.compile(r"\b(hindi|udemy|pdf|free download|telugu|tamil pdf)\b", re.I)
-
-_site_cache: dict = {"at": 0.0, "value": None}
+UA = "Mozilla/5.0 (compatible; RankwiseBot/1.0)"
+SUGGEST = "https://suggestqueries.google.com/complete/search?client=firefox&hl={hl}&gl={gl}&q={q}"
+_JUNK = re.compile(r"\.(jpe?g|png|gif|webp|svg|pdf|zip|css|js|xml)(\?|$)|/(wp-content|wp-json|feed|tag|category|author|cart|checkout|my-account|login)/", re.I)
 
 
-def _check_host(url: str) -> None:
-    host = url.split("/")[2] if "//" in url else ""
-    if host not in ALLOWED_HOSTS:
-        raise ValueError(f"host not allow-listed: {host}")
+def title_from_url(url: str) -> str:
+    tail = urlparse(url).path.rstrip("/").rsplit("/", 1)[-1]
+    return re.sub(r"\s+", " ", re.sub(r"[-_]+", " ", tail)).strip()
 
 
-def _snapshot(name: str) -> dict:
-    return json.loads((DATA_DIR / name).read_text(encoding="utf-8"))
-
-
-def _title_from_slug(url: str) -> str:
-    return re.sub(r"\s+", " ", url.rstrip("/").rsplit("/", 1)[-1].replace("-", " ")).strip()
-
-
-async def fetch_site(client: httpx.AsyncClient) -> dict:
-    """Existing site content: live Yoast sitemaps, falling back to the dated snapshot."""
-    if _site_cache["value"] and time.time() - _site_cache["at"] < 3600:
-        return _site_cache["value"]
-    items, source = [], "snapshot"
-    try:
-        locs: list[str] = []
-        for sm in ("post-sitemap.xml", "page-sitemap.xml"):
-            url = f"{SITE}/{sm}"
-            _check_host(url)
-            r = await client.get(url, timeout=10)
-            r.raise_for_status()
-            locs += re.findall(r"<loc>(https://appincoimbatore\.com/[^<]+)</loc>", r.text)
-        urls = [u for u in dict.fromkeys(locs) if _TOPIC.search(u) and not _SKIP.search(u) and u != SITE + "/"]
-        if len(urls) >= 20:
-            items = [{"url": u, "title": _title_from_slug(u)} for u in urls]
-            source = "live sitemap"
-    except Exception:  # noqa: BLE001  (offline / blocked: use the snapshot)
-        items = []
-    if not items:
-        snap = _snapshot("site_snapshot.json")
-        items, source = snap["items"], f"snapshot ({snap['fetched']})"
-    value = {"items": items, "source": source}
-    _site_cache.update(at=time.time(), value=value)
-    return value
-
-
-async def _suggest(client: httpx.AsyncClient, seed: str) -> list[str]:
-    url = SUGGEST + quote(seed)
-    _check_host(url)
-    r = await client.get(url, timeout=6)
+async def _suggest(client: httpx.AsyncClient, seed: str, lang: str, country: str) -> list[str]:
+    r = await client.get(SUGGEST.format(hl=lang, gl=country, q=quote(seed)), timeout=6)
     r.raise_for_status()
     data = json.loads(r.content.decode("utf-8", errors="ignore"))
     return [q for q in data[1] if isinstance(q, str)]
 
 
-async def autocomplete(client: httpx.AsyncClient) -> tuple[list[dict], str]:
-    results = await asyncio.gather(*[_suggest(client, s) for s in SEEDS], return_exceptions=True)
-    out, ok = [], 0
-    for seed, res in zip(SEEDS, results):
-        if isinstance(res, list):
-            ok += 1
-            out += [{"keyword": q, "seed": seed} for q in res]
-    if ok >= 3 and out:
-        return out, "Google Autocomplete (live)"
-    snap = _snapshot("seed_research.json")
-    return snap["suggestions"], f"Google Autocomplete (observed {snap['fetched']})"
-
-
-def build_candidates(suggestions: list[dict], label: str, limit: int = 40) -> list[dict]:
-    seen, cands = set(), []
+def build_candidates(suggestions: list[dict], limit: int = 40) -> list[dict]:
+    seen, out = set(), []
     for s in suggestions:
         kw = re.sub(r"\s+", " ", s["keyword"].lower()).strip()
-        if kw in seen or not _RELEVANT.search(kw) or _OTHER_CITY.search(kw) or _NOISE.search(kw):
+        if not kw or kw in seen or len(kw.split()) > 9 or len(kw) < 4:
             continue
         seen.add(kw)
-        cands.append({"keyword": kw, "source": label, "verified": True, "seed": s["seed"]})
-    return cands[:limit]
+        out.append({"keyword": kw, "source": s["source"], "verified": s["verified"], "seed": s["seed"]})
+    return out[:limit]
 
 
-async def run_research() -> dict:
+async def autocomplete(client: httpx.AsyncClient, seeds: list[str], lang: str, country: str) -> tuple[list[dict], str]:
+    """Live Google Autocomplete for each seed. If Google is unreachable the AI seeds are used and clearly labelled unverified."""
+    results = await asyncio.gather(*[_suggest(client, s, lang, country) for s in seeds], return_exceptions=True)
+    out, ok = [], 0
+    for seed, res in zip(seeds, results):
+        if isinstance(res, list):
+            ok += 1
+            out += [{"keyword": q, "seed": seed, "source": "Google Autocomplete (live)", "verified": True} for q in res]
+    if ok >= 2 and len(out) >= 8:
+        return build_candidates(out), "Google Autocomplete (live)"
+    fallback = [{"keyword": s, "seed": s, "source": "AI-suggested (not verified)", "verified": False} for s in seeds]
+    return build_candidates(out + fallback), "AI-suggested (Google Autocomplete was not reachable)"
+
+
+async def fetch_sitemap(client: httpx.AsyncClient, origin: str) -> dict:
+    """Read the pages of the user's own site from its sitemap. Returns items [{url,title}] and a status note."""
+    host = urlparse(origin).hostname
+    cand = []
+    try:
+        robots = await safeurl.safe_get(client, f"{origin}/robots.txt") or ""
+        cand += re.findall(r"(?im)^sitemap:\s*(\S+)", robots)[:3]
+    except Exception:  # noqa: BLE001
+        pass
+    cand += [f"{origin}/sitemap_index.xml", f"{origin}/sitemap.xml", f"{origin}/wp-sitemap.xml", f"{origin}/post-sitemap.xml", f"{origin}/page-sitemap.xml"]
+    urls: list[str] = []
+    seen_maps: set[str] = set()
+
+    async def read(map_url: str, depth: int) -> None:
+        if map_url in seen_maps or len(seen_maps) >= 10 or len(urls) >= 600:
+            return
+        seen_maps.add(map_url)
+        if urlparse(map_url).hostname != host:
+            return
+        try:
+            text = await safeurl.safe_get(client, map_url)
+        except Exception:  # noqa: BLE001
+            return
+        if not text or "<loc>" not in text:
+            return
+        locs = [u.strip() for u in re.findall(r"<loc>\s*([^<\s]+)\s*</loc>", text)]
+        for u in locs:
+            if urlparse(u).hostname != host:
+                continue
+            if u.endswith(".xml") and depth < 2:
+                await read(u, depth + 1)
+            elif not u.endswith(".xml") and not _JUNK.search(u):
+                urls.append(u)
+
+    for m in cand:
+        if len(urls) >= 20:
+            break
+        await read(m, 0)
+    urls = [u for u in dict.fromkeys(urls) if urlparse(u).path not in ("", "/")][:600]
+    if not urls:
+        return {"items": [], "note": f"Could not read a sitemap for {host}. The duplicate check used only your earlier pages."}
+    return {"items": [{"url": u, "title": title_from_url(u)} for u in urls], "note": f"Read {len(urls)} pages from the sitemap of {host}."}
+
+
+async def wikipedia_facts(client: httpx.AsyncClient, topic: str, lang: str) -> list[dict]:
+    """Free, citable reference text. Used only as allowed facts; may be unrelated, the writer ignores it then."""
+    if not re.fullmatch(r"[a-z]{2}", lang):
+        lang = "en"
+    base = f"https://{lang}.wikipedia.org/w/api.php"
+    try:
+        r = await client.get(base, params={"action": "query", "list": "search", "srsearch": topic, "srlimit": 2, "format": "json"}, timeout=6)
+        r.raise_for_status()
+        titles = [h["title"] for h in r.json()["query"]["search"]][:2]
+        out = []
+        for t in titles:
+            e = await client.get(base, params={"action": "query", "prop": "extracts", "exintro": 1, "explaintext": 1, "exchars": 1100,
+                                               "titles": t, "format": "json", "redirects": 1}, timeout=6)
+            e.raise_for_status()
+            page = next(iter(e.json()["query"]["pages"].values()))
+            text = (page.get("extract") or "").strip()
+            if text:
+                out.append({"title": page.get("title", t), "url": f"https://{lang}.wikipedia.org/wiki/{quote(page.get('title', t).replace(' ', '_'))}", "extract": text})
+        return out
+    except Exception:  # noqa: BLE001
+        return []
+
+
+async def run_research(req: BlogRequest, seeds: list[str], site_origin: str) -> dict:
     async with httpx.AsyncClient(headers={"User-Agent": UA}, follow_redirects=True) as client:
-        (sugg, label), site = await asyncio.gather(autocomplete(client), fetch_site(client))
-    return {"candidates": build_candidates(sugg, label), "site": site, "keyword_source": label}
+        tasks = [autocomplete(client, seeds, req.language, req.country), wikipedia_facts(client, req.topic, req.language)]
+        if site_origin:
+            tasks.append(fetch_sitemap(client, site_origin))
+        res = await asyncio.gather(*tasks)
+    candidates, label = res[0]
+    site = res[2] if site_origin else {"items": [], "note": "No website given: duplicates are checked against your earlier pages only."}
+    return {"candidates": candidates, "keyword_source": label, "facts": res[1], "site": site}

@@ -16,5 +16,23 @@ services:
       interval: 3s
       timeout: 3s
       retries: 20
+  # Backend for local development and tests (profile "dev"): docker compose --profile dev up -d app
+  app:
+    profiles: ["dev"]
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: seo-agent-app
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+    volumes:
+      - ./:/app
+    ports:
+      - "127.0.0.1:8000:8000"
 volumes:
   seo_pgdata:

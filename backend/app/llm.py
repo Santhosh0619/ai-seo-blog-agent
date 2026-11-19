@@ -1,6 +1,11 @@
-"""The one function the agent uses to call Gemini: structured output + timeout + bounded retry + model fallback."""
+"""The one function the agent uses to call Gemini: structured output + timeout + bounded retry + model fallback.
+
+The key used for a run is held in a ContextVar for that run only. It is never written to the database,
+logs, events or error messages.
+"""
 import asyncio
 import logging
+from contextvars import ContextVar
 
 from pydantic import BaseModel
 
@@ -11,6 +16,13 @@ log = logging.getLogger("seo.llm")
 BACKOFF = [1.0, 3.0]
 RATE_LIMIT_WAIT = 4.0
 
+# The Gemini key for the current run (the user's own key, or None to use the shared key).
+run_key: ContextVar[str | None] = ContextVar("run_key", default=None)
+
+
+def current_key() -> str:
+    return run_key.get() or (settings.gemini_api_key if settings.key_configured else "")
+
 
 def _wait_for(err: AppError, attempt: int, retries: int, last_model: bool) -> float | None:
     if err is RATE_LIMITED:  # free-tier limits are per model: move on to the next model, else wait once
@@ -20,16 +32,16 @@ def _wait_for(err: AppError, attempt: int, retries: int, last_model: bool) -> fl
     return None
 
 
-async def structured(schema: type[BaseModel], system: str, user: str) -> BaseModel:
+async def structured(schema: type[BaseModel], system: str, user: str, temperature: float = 0.5) -> BaseModel:
     """Return a validated `schema` instance. Tries the main model, then the fallback models."""
-    if not settings.key_configured:
+    if not current_key():
         raise MISSING_API_KEY
     models = [settings.llm_model, *[m for m in settings.fallback_models if m != settings.llm_model]]
     last: AppError = UPSTREAM_ERROR
     for i, model in enumerate(models):
         final = i == len(models) - 1
         try:
-            return await _call(model, schema, system, user, retries=settings.max_retries if final else 1, final=final)
+            return await _call(model, schema, system, user, temperature, retries=settings.max_retries if final else 1, final=final)
         except AppError as err:
             if err in (INVALID_API_KEY, MISSING_API_KEY):
                 raise
@@ -38,11 +50,11 @@ async def structured(schema: type[BaseModel], system: str, user: str) -> BaseMod
     raise last
 
 
-async def _call(model: str, schema: type[BaseModel], system: str, user: str, retries: int, final: bool) -> BaseModel:
+async def _call(model: str, schema: type[BaseModel], system: str, user: str, temperature: float, retries: int, final: bool) -> BaseModel:
     from langchain_google_genai import ChatGoogleGenerativeAI
 
     llm = ChatGoogleGenerativeAI(
-        model=model, google_api_key=settings.gemini_api_key, temperature=0.5,
+        model=model, google_api_key=current_key(), temperature=temperature,
         timeout=settings.llm_timeout, max_retries=0, max_output_tokens=8192,
     ).with_structured_output(schema)
     attempt = 0

@@ -2,12 +2,13 @@
 
 Lexical on purpose: for keyword overlap it is deterministic, free (no API quota) and explainable.
 overlap = (candidate words found together in the best-matching existing title) / (candidate words)
+>= 0.8 conflict, 0.5-0.8 partial, < 0.5 gap.
 """
 import re
 
-_STOP = {"in", "for", "the", "a", "an", "and", "of", "to", "with", "is", "how", "what", "near", "me", "at", "on", "best", "top"}
+_STOP = {"in", "for", "the", "a", "an", "and", "of", "to", "with", "is", "how", "what", "near", "me", "at", "on", "best", "top", "vs", "or", "your", "my", "do", "does", "are"}
 _SYN = {"training": "course", "courses": "course", "classes": "course", "class": "course", "institute": "course",
-        "institutes": "course", "fees": "fee", "beginners": "beginner", "marketing": "marketing", "marketer": "marketing"}
+        "institutes": "course", "fees": "fee", "beginners": "beginner", "marketer": "marketing"}
 
 
 def tokens(text: str) -> set[str]:
@@ -20,8 +21,9 @@ def tokens(text: str) -> set[str]:
     return out
 
 
-def check(candidates: list[dict], existing: list[dict]) -> list[dict]:
+def check(candidates: list[dict], existing: list[dict], topic: str = "") -> list[dict]:
     index = [(e, tokens(e["title"] + " " + e["url"].rstrip("/").rsplit("/", 1)[-1].replace("-", " "))) for e in existing]
+    topic_t = tokens(topic)
     for c in candidates:
         ct = tokens(c["keyword"])
         best, best_e, hits = 0.0, [], 0
@@ -40,9 +42,7 @@ def check(candidates: list[dict], existing: list[dict]) -> list[dict]:
         c["conflicts"] = hits
         c["status"] = "conflict" if best >= 0.8 else "partial" if best >= 0.5 else "gap"
         c["closest"] = [{"title": e["title"], "url": e["url"]} for e in best_e[:2]]
+        c["on_topic"] = round(len(ct & topic_t) / len(topic_t), 2) if topic_t else 1.0
     order = {"gap": 0, "partial": 1, "conflict": 2}
-    # gaps first; within a status prefer local-intent keywords and clearly course-related ones
-    def rank(c: dict) -> tuple:
-        kw = c["keyword"]
-        return (order[c["status"]], 0 if "coimbatore" in kw else 1, 0 if re.search(r"course|training|institute|syllabus|fee", kw) else 1, c["overlap"])
-    return sorted(candidates, key=rank)
+    # gaps first; within a status prefer keywords close to the user's topic, then the lowest overlap
+    return sorted(candidates, key=lambda c: (order[c["status"]], -c["on_topic"], c["overlap"]))

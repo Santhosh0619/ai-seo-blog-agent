@@ -1,67 +1,103 @@
-"""Deterministic fake LLM outputs used ONLY by the automated tests (not part of the app)."""
-from app.models import (CTA, FAQ, BlogPost, ImageIdea, InternalLink, KeywordInsight, OutlineSection, Plan, Section, Subsection)
-from app.seo import FIXED_URLS
+"""Deterministic fake LLM / research / images used ONLY by the automated tests (not part of the app)."""
+from app.llm import current_key
+from app.models import (CTA, FAQ, BlogPost, ImageIdea, InternalLink, KeywordInsight, OutlineSection, Plan, Section, Seeds, SourceRef, Subsection)
+
+SITE = "https://example.com"
+SITE_ITEMS = [{"url": f"{SITE}/{s}/", "title": s.replace("-", " ")} for s in ("beginner-guide", "equipment-care", "training-plan", "common-mistakes", "buying-advice")]
+FACTS = [{"title": "Cricket bat", "url": "https://en.wikipedia.org/wiki/Cricket_bat", "extract": "A cricket bat is a specialised piece of equipment used by batters to hit the ball."}]
+KEYWORDS = ["cricket bat for beginners", "how to choose a cricket bat", "cricket bat weight guide", "cricket bat care tips", "best cricket bat size",
+            "cricket bat knocking in", "cricket bat grip types", "junior cricket bat guide", "cricket bat vs tennis ball bat", "cricket bat wood types"]
 
 _FILL = [
-    "Good digital marketing training balances theory with live practice, so every concept is tested on a real campaign or website.",
-    "Start by learning how search engines, social platforms and paid ads work together, then specialise in the channel that fits your goals.",
-    "Hands-on projects matter more than certificates, because employers want to see a portfolio of work that you can explain clearly.",
-    "Analytics is the thread that connects every channel, so learn to read reports, set goals and judge results with simple metrics.",
-    "Consistency beats intensity: a steady weekly routine of practice, review and small experiments builds skill faster than occasional bursts.",
-    "Ask how often the curriculum is updated, because platforms and algorithms change quickly and old material loses value.",
-    "Look for mentors who have run real campaigns and can share mistakes as well as successes, since that is where most learning happens.",
-    "Local context helps too: understanding how Coimbatore businesses find customers makes your practice projects more realistic.",
+    "Start small and practise every day.", "Keep the basics simple and clear.", "Good habits build skill over time.",
+    "Watch how experienced players do it.", "Ask for feedback and fix one thing at a time.", "Short sessions work better than long ones.",
+    "Write down what worked and what did not.", "Choose gear that fits your size and your budget.", "Look after your equipment and it will last.",
+    "Mistakes are normal, so learn from each one.", "Compare a few options before you decide.", "Take your time and enjoy the process.",
 ]
 
 
 def _para(i: int, extra: str = "") -> str:
-    s = [_FILL[(i + k) % len(_FILL)] for k in range(5)]
-    return " ".join(s) + (" " + extra if extra else "")
+    return " ".join(_FILL[(i + k) % len(_FILL)] for k in range(5)) + (" " + extra if extra else "")
 
 
-def sim_plan(ctx: dict) -> Plan:
-    short = ctx["shortlist"]
-    primary = short[0]["keyword"]
-    secondary = [c["keyword"] for c in short[1:6]]
-    insights = [KeywordInsight(keyword=c["keyword"], intent="commercial" if "course" in c["keyword"] else "informational",
-                               relevance="high", competition="medium" if c["status"] != "gap" else "low",
-                               volume_band="medium", note="Simulated estimate (testing fixture).") for c in short[:8]]
+def fake_candidates() -> list[dict]:
+    return [{"keyword": k, "source": "Google Autocomplete (live)", "verified": True, "seed": "cricket bat"} for k in KEYWORDS]
+
+
+async def fake_research(req, seeds, site_origin):
+    return {"candidates": fake_candidates(), "keyword_source": "Google Autocomplete (live)", "facts": list(FACTS),
+            "site": {"items": list(SITE_ITEMS) if site_origin else [], "note": "fake sitemap" if site_origin else "No website given"}}
+
+
+def make_plan(primary: str, secondary: list[str]) -> Plan:
     outline = [OutlineSection(h2=h, h3s=h3) for h, h3 in [
-        (f"What to expect from {primary}", ["Who it suits", "Skills you build"]),
-        ("Core modules to look for", ["Search and content", "Paid ads and analytics"]),
-        ("How to judge a training provider", []), ("A practical learning roadmap", ["First 30 days"]),
-        ("Career paths after training", []), ("Next steps", [])]]
-    slug = "-".join(primary.split()[:7])
-    return Plan(primary_keyword=primary, secondary_keywords=secondary, topic=f"{primary.title()}: what to look for", slug=slug,
-                audience="Students and career-switchers in Coimbatore", search_intent="Commercial investigation: comparing options before enrolling",
-                reasoning="Simulated reasoning: this keyword has the lowest overlap with existing Appin pages.", insights=insights, outline=outline)
+        (f"What {primary} really means", ["Who it suits", "Common questions"]), ("How to choose well", ["Size and weight", "Budget"]),
+        ("Care and maintenance", []), ("A simple weekly routine", ["First month"]), ("Mistakes to avoid", []), ("Next steps", [])]]
+    insights = [KeywordInsight(keyword=k, intent="informational", relevance="high", competition="low", volume_band="medium", note="AI estimate in tests.") for k in [primary, *secondary][:8]]
+    return Plan(primary_keyword=primary, secondary_keywords=secondary, reasoning="Lowest overlap with existing pages.", topic=f"{primary.title()}: a practical guide",
+                angle="A calm, step by step guide for first-time buyers", slug="-".join(primary.split()[:7]), audience="Beginners", search_intent="Informational", insights=insights, outline=outline)
 
 
-def sim_post(ctx: dict) -> BlogPost:
-    plan: Plan = ctx["plan"]
+def good_post(plan: Plan, links: bool = True) -> BlogPost:
     p, sec = plan.primary_keyword, plan.secondary_keywords
-    title = (p.title() + " | Appin")[:60] if len(p) < 50 else p.title()[:60]
-    meta = f"Planning {p}? See the modules, projects and questions that matter, with practical advice from Appin Technology's Coimbatore team."
-    meta = (meta + " Read the guide.")[:158] if len(meta) < 120 else meta[:158]
     sections = []
     for i, o in enumerate(plan.outline):
-        extra = f"If you are comparing options for {p}, use this section as a checklist." if i in (0, 2, 4) else ""
+        extra = f"This helps when you think about {p}." if i in (0, 2, 4) else ""
         if i == 1 and sec:
-            extra += f" Many learners also search for {sec[0]}."
+            extra += f" Many people also search for {sec[0]}."
         if i == 3 and len(sec) > 1:
-            extra += f" Related topics include {sec[1]}."
-        subs = [Subsection(heading=h, paragraphs=[_para(i + j + 2)], bullets=[]) for j, h in enumerate(o.h3s)]
-        sections.append(Section(heading=o.h2, paragraphs=[_para(i, extra), _para(i + 3)], bullets=[_FILL[i % 8][:80], _FILL[(i + 1) % 8][:80]], subsections=subs))
-    sections[2].paragraphs.append("Review the digital marketing syllabus carefully before you decide, and contact the Appin team with any questions about placement training in Coimbatore.")
-    intro = [f"Choosing {p} is a big decision, so this guide walks through what to look for. " + _para(0), _para(4)]
-    faqs = [FAQ(question=q, answer=f"{_FILL[i]} {_FILL[i + 1]}" + (f" This applies to {p} too." if i == 0 else ""))
-            for i, q in enumerate(["Who can join?", "Do I need a technical background?", "How should I practise?", "What projects should I build?", "How do I choose a provider?"])]
-    links = [InternalLink(anchor="digital marketing syllabus", url=FIXED_URLS[0], reason="Shows the topics covered"),
-             InternalLink(anchor="contact the Appin team", url=FIXED_URLS[1], reason="Lets readers ask questions"),
-             InternalLink(anchor="placement training in Coimbatore", url=FIXED_URLS[2], reason="Career-support information")]
-    images = [ImageIdea(description=f"Students working on a live campaign dashboard in a classroom ({p})", alt="Students analysing a digital marketing campaign dashboard together in a Coimbatore classroom", placement="After the introduction"),
-              ImageIdea(description="Roadmap graphic of the learning path", alt="Step-by-step roadmap graphic showing the stages of learning digital marketing", placement="In the roadmap section"),
-              ImageIdea(description="Mentor reviewing a student's portfolio", alt="Mentor reviewing a student's digital marketing portfolio on a laptop", placement="Near the end")]
-    cta = CTA(heading="Start your Digital Marketing journey with Appin Technology", text="Download the Digital Marketing syllabus or enquire about the Digital Marketing course in Coimbatore with placement assistance.", button_text="Enquire about the course")
-    return BlogPost(seo_title=title, meta_description=meta, slug=plan.slug, h1=plan.topic if p in plan.topic.lower() else f"{plan.topic} ({p})",
-                    intro=intro, sections=sections, faqs=faqs, internal_links=links, images=images, cta=cta, secondary_keywords_used=sec[:3])
+            extra += f" Related ideas include {sec[1]}."
+        if i == 2:
+            extra += " Read the beginner guide and the equipment care page for more help."
+        if i == 4:
+            extra += " The training plan and the common mistakes page go deeper."
+        subs = [Subsection(heading=h, paragraphs=[_para(i + j + 2), _para(i + j + 5)], bullets=[]) for j, h in enumerate(o.h3s)]
+        sections.append(Section(heading=o.h2, paragraphs=[_para(i, extra), _para(i + 3), _para(i + 6)], bullets=[_FILL[i % 12], _FILL[(i + 1) % 12]], subsections=subs))
+    intro = [f"Choosing {p} is easier when you follow a simple plan. " + _para(0), _para(4)]
+    faqs = [FAQ(question=q, answer=" ".join(_FILL[(i + k) % 12] for k in range(4)) + (f" This applies to {p} too." if i == 0 else ""))
+            for i, q in enumerate(["Who can start?", "Do I need much money?", "How often should I practise?", "What should I avoid?", "How do I improve?"])]
+    ilinks = [InternalLink(anchor="beginner guide", url=SITE_ITEMS[0]["url"], reason="Start here"),
+              InternalLink(anchor="equipment care page", url=SITE_ITEMS[1]["url"], reason="Keep gear in shape"),
+              InternalLink(anchor="training plan", url=SITE_ITEMS[2]["url"], reason="A weekly routine")] if links else []
+    images = [ImageIdea(description="A bat and ball on grass", alt="A wooden bat and a red ball resting on fresh green grass", placement="hero", query="cricket bat"),
+              ImageIdea(description="A player practising a shot", alt="A young player practising a forward defensive shot in the nets", placement="section 2", query="cricket batting"),
+              ImageIdea(description="Equipment laid out", alt="Cricket pads, gloves and a helmet laid out neatly on a bench", placement="section 4", query="cricket equipment")]
+    meta = f"Learn {p} step by step. Clear advice, common mistakes and simple routines that help you start with confidence this season."
+    title = f"{p.title()}: A Practical Guide"[:60]
+    return BlogPost(seo_title=title, meta_description=meta, slug=plan.slug, h1=f"{p.title()}: a practical guide", intro=intro,
+                    takeaways=["Start with the basics.", "Choose gear that fits you.", "Practise a little every day."], sections=sections, faqs=faqs,
+                    internal_links=ilinks, images=images, sources=[SourceRef(title=FACTS[0]["title"], url=FACTS[0]["url"])],
+                    cta=CTA(heading="Ready for your next step?", text="Pick one tip from this guide and try it this week.", button_text="Visit the site"),
+                    secondary_keywords_used=sec[:3])
+
+
+def weak_post(plan: Plan) -> BlogPost:
+    """Fails many checks on purpose (short, one FAQ, no images)."""
+    p = good_post(plan)
+    p.sections = p.sections[:2]
+    p.faqs = p.faqs[:1]
+    p.images = []
+    p.takeaways = []
+    return p
+
+
+def fake_llm(weak_first: bool = False, seen_keys: list | None = None):
+    state = {"plan": None}
+
+    async def structured(schema, system, user, temperature=0.5):
+        if seen_keys is not None:
+            seen_keys.append(current_key())
+        if schema is Seeds:
+            return Seeds(seeds=["cricket bat for beginners", "how to choose a cricket bat", "cricket bat weight", "best cricket bat size",
+                                "cricket bat care", "cricket bat grip", "junior cricket bat", "knocking in a cricket bat"], audience_guess="beginners")
+        if schema is Plan:
+            lines = [l for l in user.splitlines() if l.startswith("- ") and "| status=" in l]
+            kws = [l[2:].split(" | ")[0] for l in lines]
+            state["plan"] = make_plan(kws[0], kws[1:6])
+            return state["plan"]
+        plan = state["plan"]
+        has_links = "ALLOWED INTERNAL LINK URLS (data):\nnone" not in user
+        if "FIXING" in system:
+            return good_post(plan, has_links)
+        return weak_post(plan) if weak_first else good_post(plan, has_links)
+    return structured
