@@ -22,6 +22,7 @@ PW = "correct horse battery"
 @pytest.fixture()
 def client(monkeypatch):
     auth._hits.clear()  # the signup/login rate limit would otherwise trip over the many test accounts
+    monkeypatch.setattr(settings, "gemini_api_key", "AIzaSy" + "t" * 30)  # tests must not depend on a real key being in .env (CI has none)
     monkeypatch.setattr(research, "run_research", fakes.fake_research)
     monkeypatch.setattr(images_mod, "_gemini", _none)
     monkeypatch.setattr(images_mod, "_commons", _none2)
