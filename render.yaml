@@ -9,9 +9,19 @@ services:
         sync: false
       - key: DATABASE_URL
         sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: PEXELS_API_KEY
+        sync: false
       - key: LLM_MODEL
         value: gemini-3.5-flash
-      - key: MAX_RUNS_PER_HOUR
-        value: "6"
+      - key: FREE_RUNS_PER_DAY
+        value: "2"
+      - key: GLOBAL_FREE_RUNS_PER_DAY
+        value: "40"
+      - key: PUBLIC_URL
+        value: https://ai-seo-blog-agent.onrender.com
       - key: CORS_ORIGINS
         value: https://ai-seo-blog-agent.onrender.com

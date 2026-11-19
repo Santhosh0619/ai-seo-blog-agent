@@ -379,3 +379,30 @@ def test_request_validation():
     assert r.topic == "cricket bats" and r.country == "in" and r.language == "en" and r.tone == "friendly"
     with pytest.raises(Exception):
         BlogRequest(topic="ok topic", country="india")
+
+
+# ---- model fallback and the circuit breaker ------------------------------------------------------------------------------------------------------
+async def test_failed_models_are_skipped_next_time_and_bad_key_stops(monkeypatch):
+    from app import llm
+    llm._bad.clear()
+    calls: list[str] = []
+
+    async def fake_call(model, schema, system, user, temperature, timeout, retries, final):
+        calls.append(model)
+        if model == "m3":
+            return "ok"
+        raise errors.INVALID_API_KEY if model == "bad-key" else errors.UPSTREAM_ERROR
+
+    monkeypatch.setattr(llm, "_call", fake_call)
+    monkeypatch.setattr(settings, "gemini_api_key", "AIzaSy" + "x" * 30)
+    monkeypatch.setattr(settings, "llm_model", "m1")
+    monkeypatch.setattr(settings, "fallback_models", ["m2", "m3"])
+    assert await llm.structured(dict, "s", "u") == "ok" and calls == ["m1", "m2", "m3"]
+    calls.clear()
+    assert await llm.structured(dict, "s", "u") == "ok" and calls == ["m3"], "models that just failed are tried last"
+    monkeypatch.setattr(settings, "llm_model", "bad-key")
+    llm._bad.clear()
+    with pytest.raises(errors.AppError) as e:
+        await llm.structured(dict, "s", "u")
+    assert e.value.code == "INVALID_API_KEY"
+    llm._bad.clear()

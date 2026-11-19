@@ -84,7 +84,7 @@ def weak_post(plan: Plan) -> BlogPost:
 def fake_llm(weak_first: bool = False, seen_keys: list | None = None):
     state = {"plan": None}
 
-    async def structured(schema, system, user, temperature=0.5):
+    async def structured(schema, system, user, temperature=0.5, timeout=None):
         if seen_keys is not None:
             seen_keys.append(current_key())
         if schema is Seeds:

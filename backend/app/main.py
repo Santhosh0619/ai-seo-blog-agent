@@ -41,7 +41,8 @@ class _Redact(logging.Filter):
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 for h in logging.getLogger().handlers:
     h.addFilter(_Redact())
-logging.getLogger("httpx").setLevel(logging.WARNING)  # request URLs can carry query strings
+for _n in ("httpx", "httpx2", "google_genai", "httpcore"):
+    logging.getLogger(_n).setLevel(logging.WARNING)  # request URLs can carry query strings
 log = logging.getLogger("seo.api")
 _active: set[int] = set()  # users with a run in progress (one run per user, a few at a time overall)
 

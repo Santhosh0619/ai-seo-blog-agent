@@ -59,7 +59,7 @@ def _failing(state: State) -> list[dict]:
 
 async def seeds_node(state: State) -> dict:
     req = state["req"]
-    out = await structured(Seeds, prompts.SEEDS_SYSTEM, prompts.seeds_user(req), temperature=0.6)
+    out = await structured(Seeds, prompts.SEEDS_SYSTEM, prompts.seeds_user(req), temperature=0.6, timeout=30)
     seeds = []
     for s in out.seeds:
         s = re.sub(r"\s+", " ", s.lower()).strip(" .?!\"'")
@@ -88,7 +88,7 @@ async def dedupe_node(state: State) -> dict:
 
 
 async def plan_node(state: State) -> dict:
-    plan = await structured(Plan, prompts.PLAN_SYSTEM, prompts.plan_user(state["req"], state["shortlist"], state["stats"], state["prior_titles"], state["facts"]))
+    plan = await structured(Plan, prompts.PLAN_SYSTEM, prompts.plan_user(state["req"], state["shortlist"], state["stats"], state["prior_titles"], state["facts"]), timeout=60)
     return {"plan": plan}
 
 
@@ -100,7 +100,7 @@ async def write_node(state: State) -> dict:
     req, plan = state["req"], state["plan"]
     links = _links(state)
     post = await structured(BlogPost, prompts.write_system(req, bool(links), bool(state["facts"])),
-                            prompts.write_user(req, plan.model_dump(), state["facts"], links), temperature=0.7)
+                            prompts.write_user(req, plan.model_dump(), state["facts"], links), temperature=0.7, timeout=100)
     return {"post": post}
 
 
@@ -132,7 +132,7 @@ async def repair_node(state: State) -> dict:
     issues = [f"{c['label']} (currently: {c['detail'] or 'failed'}). Fix: {c['fix']}" for c in _failing(state)]
     links = _links(state)
     post = await structured(BlogPost, prompts.repair_system(req, bool(links), bool(state["facts"])),
-                            prompts.repair_user(req, state["post"].model_dump(), plan.model_dump(), issues, state["facts"], links), temperature=0.4)
+                            prompts.repair_user(req, state["post"].model_dump(), plan.model_dump(), issues, state["facts"], links), temperature=0.4, timeout=100)
     return {"post": post, "repaired": True}
 
 

@@ -102,7 +102,7 @@ def _run(fn):
 
 def init() -> None:
     def fn(c):
-        # V1 (single-site prototype) tables had no user_id: they are dropped on purpose (all old data is wiped).
+        # Older single-site tables had no user_id: they are dropped on purpose (all old data is wiped).
         old = c.execute("SELECT 1 FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = 'pages'").fetchone()
         new = c.execute("SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'pages' AND column_name = 'user_id'").fetchone()
         if old and not new:
