@@ -3,13 +3,42 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="An AI agent that researches real keywords, avoids topics you already cover, writes an original article with images and scores it with 22 SEO checks." />
+    <title>__TITLE__</title>
+    <meta name="description" content="__DESC__" />
+    <meta name="robots" content="__ROBOTS__" />
+    <link rel="canonical" href="__CANONICAL__" />
     <meta name="theme-color" content="#4f46e5" />
-    <title>Rankwise: SEO blog pages for any topic</title>
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Rankwise" />
+    <meta property="og:title" content="__TITLE__" />
+    <meta property="og:description" content="__DESC__" />
+    <meta property="og:url" content="__CANONICAL__" />
+    <meta property="og:image" content="__BASE__/og.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="__TITLE__" />
+    <meta name="twitter:description" content="__DESC__" />
+    <meta name="twitter:image" content="__BASE__/og.jpg" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%234f46e5'/%3E%3Cpath d='M12 5l1.5 4.2L17.7 10.7l-4.2 1.5L12 16.4l-1.5-4.2L6.3 10.7l4.2-1.5z' fill='white'/%3E%3C/svg%3E" />
+    <script type="application/ld+json">
+      {"@context":"https://schema.org","@graph":[
+        {"@type":"WebSite","name":"Rankwise","url":"__BASE__/"},
+        {"@type":"SoftwareApplication","name":"Rankwise","applicationCategory":"BusinessApplication","operatingSystem":"Web",
+         "url":"__BASE__/","description":"An AI agent that researches keywords, writes and scores SEO blog pages for any topic.",
+         "offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}
+      ]}
+    </script>
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <main style="font-family:system-ui,sans-serif;max-width:640px;margin:40px auto;padding:0 20px;line-height:1.6">
+        <h1>Rankwise: SEO blog pages for any topic</h1>
+        <p>An AI agent that researches real keywords with Google Autocomplete, avoids topics you already cover, writes an original article with images and checks it against 22 transparent SEO rules. Free to try: 2 pages a day.</p>
+        <p>Rankwise needs JavaScript to run. <a href="/privacy">Privacy</a></p>
+      </main>
+    </noscript>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

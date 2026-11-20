@@ -14,6 +14,12 @@ React (Vite) --SSE--> FastAPI --> LangGraph agent --> Gemini (structured output)
 ![Landing page](docs/screenshots/landing.jpg)
 ![A finished page with its SEO score and preview](docs/screenshots/result.jpg)
 
+## Demo
+A short walkthrough video (topic in, finished page out in about a minute) and a few more screenshots, such as the live agent view, the score breakdown and the history page, will be added here soon.
+
+<!-- TODO: add the demo video link/GIF here -->
+<!-- TODO: add screenshots: docs/screenshots/agent-run.png, score.png, history.png -->
+
 ## What the agent does
 | Step | How | Data label |
 |---|---|---|
@@ -28,6 +34,12 @@ React (Vite) --SSE--> FastAPI --> LangGraph agent --> Gemini (structured output)
 | 9 Save | Page, checks, research and images saved to your account | |
 
 About 3-4 Gemini calls per page. Models fall back automatically (`gemini-3.5-flash`, `3.8-flash`, `3.1-flash-lite`) and a model that just failed is skipped for a few minutes.
+
+## The product's own SEO
+Rankwise practises what it preaches. The React app is served through the backend, which fills the page tags on every request, so crawlers and link previews do not need JavaScript:
+- Per-page `<title>`, meta description, canonical URL and robots rule (public pages are indexable; `/app`, sign-in, reset and share pages are `noindex`).
+- Open Graph and Twitter card tags with a 1200x630 preview image, and JSON-LD (`WebSite` and `SoftwareApplication`).
+- A real `robots.txt` and `sitemap.xml` built from the actual domain, and a `<noscript>` summary for visitors without JavaScript.
 
 ## Accounts and privacy
 - Sign up with email and password, or **Continue with Google** (when configured). Passwords are hashed with scrypt; sessions are httpOnly, SameSite=Lax cookies.

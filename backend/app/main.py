@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import auth, db, mailer, page, safeurl
+from . import auth, db, mailer, page, safeurl, sitepages
 from .agent import run_agent
 from .auth import current_user, public_base
 from .config import PRODUCT_NAME, ROOT, settings, startup_report
@@ -267,16 +267,29 @@ async def account_delete(user: dict = Depends(current_user)):
     return resp
 
 
+# ---- the product's own SEO files (always available) --------------------------------------------------------------------
+@app.get("/robots.txt", response_class=Response)
+async def robots(request: Request):
+    return Response(sitepages.robots_txt(public_base(request)), media_type="text/plain; charset=utf-8")
+
+
+@app.get("/sitemap.xml", response_class=Response)
+async def sitemap(request: Request):
+    return Response(sitepages.sitemap_xml(public_base(request)), media_type="application/xml; charset=utf-8")
+
+
 # ---- React build (production): served by the same app -----------------------------------------------------------------
 DIST = ROOT / "frontend" / "dist"
 if DIST.exists():
     app.mount("/assets", StaticFiles(directory=DIST / "assets"), name="assets")
+    _INDEX = (DIST / "index.html").read_text(encoding="utf-8")
 
     @app.get("/{path:path}")
-    async def spa(path: str):
+    async def spa(path: str, request: Request):
         if path.startswith("api/"):
             return JSONResponse(NOT_FOUND.to_dict(), status_code=404)
         f = (DIST / path).resolve()
         if path and f.is_file() and DIST in f.parents:
             return FileResponse(f)
-        return FileResponse(DIST / "index.html")
+        html_page = sitepages.render_index(_INDEX, public_base(request), "/" + path)
+        return HTMLResponse(html_page, status_code=200 if path.strip("/").split("/")[0] in ("", "app", *sitepages.PAGES) else 404)

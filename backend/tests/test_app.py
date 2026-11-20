@@ -563,3 +563,47 @@ def test_mail_message_is_well_formed():
     import pytest as _p
     with _p.raises(Exception):
         m.build_message("a@example.test\nBcc: evil@example.test", subject, text, html)  # header injection is refused
+
+
+# ---- the product's own SEO ---------------------------------------------------------------------------------------------------------------
+def test_robots_and_sitemap_use_the_real_domain(client):
+    r = client.get("/robots.txt", headers={"Host": "rank.example.org"})
+    assert r.status_code == 200 and r.headers["content-type"].startswith("text/plain")
+    assert "Disallow: /app/" in r.text and "Disallow: /api/" in r.text and "Disallow: /s/" in r.text
+    assert "Sitemap: http://rank.example.org/sitemap.xml" in r.text
+    s = client.get("/sitemap.xml", headers={"Host": "rank.example.org"})
+    assert s.status_code == 200 and "xml" in s.headers["content-type"]
+    import xml.etree.ElementTree as ET
+    locs = [e.text for e in ET.fromstring(s.text).iter("{http://www.sitemaps.org/schemas/sitemap/0.9}loc")]
+    assert locs == ["http://rank.example.org/", "http://rank.example.org/privacy"]
+
+
+def test_index_tags_are_filled_per_page():
+    from app import sitepages
+    tpl = ("<title>__TITLE__</title><meta name=\"description\" content=\"__DESC__\"><meta name=\"robots\" content=\"__ROBOTS__\">"
+           "<link rel=\"canonical\" href=\"__CANONICAL__\"><meta property=\"og:image\" content=\"__BASE__/og.jpg\">")
+    home = sitepages.render_index(tpl, "https://x.test", "/")
+    assert "__" not in home and 'content="index,follow"' in home and 'href="https://x.test/"' in home and "https://x.test/og.jpg" in home
+    priv = sitepages.render_index(tpl, "https://x.test", "/privacy")
+    assert "Privacy" in priv and 'href="https://x.test/privacy"' in priv
+    for private in ("/app/new", "/login", "/signup", "/forgot", "/reset", "/anything-else"):
+        out = sitepages.render_index(tpl, "https://x.test", private)
+        assert "noindex" in out and "__" not in out, private
+
+
+def test_real_index_template_has_the_seo_tags():
+    import pathlib
+    tpl = (pathlib.Path(__file__).resolve().parents[2] / "frontend" / "index.html").read_text(encoding="utf-8")
+    for needle in ("__TITLE__", "__DESC__", "__ROBOTS__", "__CANONICAL__", "__BASE__/og.jpg", "application/ld+json", "twitter:card", "og:title", "<noscript>"):
+        assert needle in tpl, needle
+    import json, re
+    from app import sitepages
+    out = sitepages.render_index(tpl, "https://x.test", "/")
+    ld = json.loads(re.search(r'<script type="application/ld\+json">(.*?)</script>', out, re.S).group(1))
+    assert ld["@graph"][1]["offers"]["price"] == "0" and ld["@graph"][0]["url"] == "https://x.test/"
+
+
+def test_titles_and_descriptions_are_sensible_lengths():
+    from app import sitepages
+    for key, (title, desc, _) in sitepages.PAGES.items():
+        assert 15 <= len(title) <= 60 and 50 <= len(desc) <= 200, key
