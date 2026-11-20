@@ -26,6 +26,21 @@ OUT = Path(__file__).resolve().parents[2] / ".gmail_refresh_token"
 REDIRECT = f"http://127.0.0.1:{PORT}"
 
 
+DONE_PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Email permission saved</title><style>
+:root{color-scheme:light dark}*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;font:16px/1.6 system-ui,Segoe UI,Arial,sans-serif;background:#f7f6f3;color:#14161c;padding:24px}
+@media(prefers-color-scheme:dark){body{background:#0b0d13;color:#eceef6}.card{background:#141824!important;border-color:#242a3a!important}p{color:#a2a9bd!important}}
+.card{max-width:440px;text-align:center;background:#fff;border:1px solid #e4e1da;border-radius:22px;padding:38px 32px;box-shadow:0 24px 60px -28px rgba(60,50,140,.4)}
+.ok{width:64px;height:64px;border-radius:50%;margin:0 auto 18px;display:grid;place-items:center;color:#fff;font-size:32px;background:linear-gradient(135deg,#4f46e5,#8b5cf6 55%,#d946ef)}
+h1{margin:0 0 8px;font-size:1.5rem;letter-spacing:-.02em}p{margin:0 0 10px;color:#5e6577}
+.hint{margin-top:18px;font-size:14px}
+</style></head><body><main class="card"><div class="ok">&#10003;</div>
+<h1>All set</h1><p>Rankwise can now send password reset emails from your Gmail address.</p>
+<p>You can close this tab and go back to the app. The next steps are in your chat with Claude.</p>
+<p class="hint">You can cancel this permission any time at myaccount.google.com/permissions.</p></main></body></html>""".encode("utf-8")
+
+
 def main() -> int:
     cid, secret = os.getenv("GMAIL_CLIENT_ID", "").strip(), os.getenv("GMAIL_CLIENT_SECRET", "").strip()
     if not cid or not secret:
@@ -52,7 +67,7 @@ def main() -> int:
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
-            self.wfile.write(b"<h2>Done. You can close this tab.</h2><p>Go back to the terminal.</p>")
+            self.wfile.write(DONE_PAGE)
             done.set()
 
         def log_message(self, *args):  # keep the authorization code out of the logs
