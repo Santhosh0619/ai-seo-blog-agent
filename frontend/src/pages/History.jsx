@@ -43,7 +43,7 @@ export default function History() {
           <div className="hgrid">
             {shown.map((p) => (
               <Link key={p.id} to={`/app/pages/${p.id}`} className="card hcard fade-up">
-                <div className="hcover" style={p.cover ? undefined : { background: gradientFor(p.id) }}>{p.cover ? <img src={`/img/${p.cover}`} alt="" loading="lazy" /> : null}<span className="pill">{p.score}</span></div>
+                <div className="hcover" style={{ background: gradientFor(p.id) }}>{p.cover ? <img src={`/img/${p.cover}`} alt="" loading="lazy" /> : null}<span className="pill">{p.score}</span></div>
                 <div className="hbody">
                   <h3>{p.title}</h3>
                   <div className="meta">
