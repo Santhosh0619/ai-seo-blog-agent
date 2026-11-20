@@ -31,7 +31,7 @@ export function CheckList({ checks, defaultOpenFailed = true }) {
         return (
           <li key={c.id}>
             <details className={`chk ${cls}`} open={defaultOpenFailed && cls === "fail"}>
-              <summary><span className="ic"><Icon size={13} strokeWidth={3} /></span><span>{c.label}</span><span className="det">{c.applicable ? c.detail : "not applicable"}</span></summary>
+              <summary><span className="lab"><span className="ic"><Icon size={13} strokeWidth={3} /></span><span>{c.label}</span></span><span className="det">{c.applicable ? c.detail : "not applicable"}</span></summary>
               <div className="body">
                 <div><b>Why it matters:</b> {c.why}</div>
                 {cls === "fail" && <div><b>How to fix:</b> {c.fix}</div>}

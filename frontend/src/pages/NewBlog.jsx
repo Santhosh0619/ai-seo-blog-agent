@@ -161,7 +161,7 @@ export default function NewBlog() {
           <label className="sr" htmlFor="topic">Topic</label>
           <div className="topic">
             <Wand2 size={22} />
-            <input id="topic" value={form.topic} onChange={set("topic")} placeholder="What should the page be about?" maxLength={120} autoFocus />
+            <input id="topic" value={form.topic} onChange={set("topic")} placeholder="What is your page about?" maxLength={120} autoFocus />
             <button className="btn btn-primary btn-lg" type="submit" disabled={running}>{running ? <Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} /> : <Sparkles size={18} />} Create blog page</button>
           </div>
           <div className="chips" style={{ marginTop: 14 }}>

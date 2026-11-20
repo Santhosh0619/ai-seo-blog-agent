@@ -282,7 +282,14 @@ async def sitemap(request: Request):
 DIST = ROOT / "frontend" / "dist"
 if DIST.exists():
     app.mount("/assets", StaticFiles(directory=DIST / "assets"), name="assets")
-    _INDEX = (DIST / "index.html").read_text(encoding="utf-8")
+    _idx: dict = {"mtime": 0.0, "html": ""}
+
+    def _index() -> str:
+        f = DIST / "index.html"
+        mt = f.stat().st_mtime
+        if mt != _idx["mtime"]:
+            _idx.update(mtime=mt, html=f.read_text(encoding="utf-8"))
+        return _idx["html"]
 
     @app.get("/{path:path}")
     async def spa(path: str, request: Request):
@@ -291,5 +298,5 @@ if DIST.exists():
         f = (DIST / path).resolve()
         if path and f.is_file() and DIST in f.parents:
             return FileResponse(f)
-        html_page = sitepages.render_index(_INDEX, public_base(request), "/" + path)
+        html_page = sitepages.render_index(_index(), public_base(request), "/" + path)
         return HTMLResponse(html_page, status_code=200 if path.strip("/").split("/")[0] in ("", "app", *sitepages.PAGES) else 404)

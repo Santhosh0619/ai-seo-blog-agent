@@ -5,6 +5,8 @@ import { api } from "../api";
 import { useToast } from "../state";
 import { Modal, fmtDate } from "../ui";
 
+const gradientFor = (id) => { const h = (id * 47) % 360; return `linear-gradient(135deg, hsl(${h} 68% 56%), hsl(${(h + 70) % 360} 68% 44%))`; };
+
 export default function History() {
   const toast = useToast();
   const [pages, setPages] = useState(null);
@@ -41,14 +43,14 @@ export default function History() {
           <div className="hgrid">
             {shown.map((p) => (
               <Link key={p.id} to={`/app/pages/${p.id}`} className="card hcard fade-up">
-                <div className="hcover">{p.cover ? <img src={`/img/${p.cover}`} alt="" loading="lazy" /> : null}<span className="pill">{p.score}</span></div>
+                <div className="hcover" style={p.cover ? undefined : { background: gradientFor(p.id) }}>{p.cover ? <img src={`/img/${p.cover}`} alt="" loading="lazy" /> : null}<span className="pill">{p.score}</span></div>
                 <div className="hbody">
                   <h3>{p.title}</h3>
                   <div className="meta">
                     <span>{p.primary_keyword}</span><span>·</span><span>{fmtDate(p.created_at)}</span>
                     {p.shared && <span className="badge ok"><Globe size={11} /> shared</span>}
                     {p.score_before != null && <span className="badge brand"><Wrench size={11} /> repaired</span>}
-                    <button className="icon-btn" style={{ marginLeft: "auto", width: 30, height: 30 }} aria-label={`Delete ${p.title}`} onClick={(e) => { e.preventDefault(); setDel(p); }}><Trash2 size={15} /></button>
+                    <button className="icon-btn" style={{ marginLeft: "auto", width: 34, height: 34 }} aria-label={`Delete ${p.title}`} onClick={(e) => { e.preventDefault(); setDel(p); }}><Trash2 size={15} /></button>
                   </div>
                 </div>
               </Link>

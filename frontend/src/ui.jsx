@@ -61,7 +61,7 @@ export function Alert({ kind = "info", children, onClose }) {
   return (
     <div className={`alert ${kind}`} role={kind === "bad" ? "alert" : "status"}>
       <div style={{ flex: 1 }}>{children}</div>
-      {onClose && <button className="icon-btn" style={{ width: 24, height: 24 }} onClick={onClose} aria-label="Dismiss"><X size={14} /></button>}
+      {onClose && <button className="icon-btn" onClick={onClose} aria-label="Dismiss"><X size={14} /></button>}
     </div>
   );
 }

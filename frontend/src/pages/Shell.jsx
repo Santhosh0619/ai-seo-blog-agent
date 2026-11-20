@@ -1,5 +1,5 @@
 import { ChevronDown, FilePlus2, History as HistoryIcon, LogOut, Settings } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../state";
 import { Logo, ThemeToggle } from "../ui";
@@ -24,11 +24,17 @@ function UserBlock() {
   const nav = useNavigate();
   const [open, setOpen] = useState(false);
   const name = user.name || user.email.split("@")[0];
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = (e) => { if (!e.target.closest?.('.rel')) setOpen(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [open]);
   return (
     <div className="rel" style={{ display: "block" }}>
       <button className="user btn-ghost btn" style={{ width: "100%", justifyContent: "flex-start", padding: 8 }} onClick={() => setOpen(!open)} aria-expanded={open}>
         <span className="avatar">{name[0].toUpperCase()}</span>
-        <span className="who" style={{ textAlign: "left" }}><b>{name}</b><span>{user.email}</span></span>
+        <span className="who" style={{ textAlign: "left" }} title={`${name} (${user.email})`}><b>{name}</b><span>{user.email}</span></span>
         <ChevronDown size={16} style={{ marginLeft: "auto" }} />
       </button>
       {open && (

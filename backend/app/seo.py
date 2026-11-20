@@ -14,7 +14,7 @@ GROUPS = {"onpage": ("On-page basics", 30), "content": ("Content quality", 30), 
 CLICHES = [
     "in today's fast-paced world", "in today's digital age", "in the ever-evolving", "ever-evolving landscape", "delve into", "delve deeper",
     "unlock the power", "unlock the secrets", "game-changer", "game changer", "dive into", "navigate the world of", "in conclusion,",
-    "it's important to note that", "it is important to note that", "look no further", "take your", "to the next level", "tapestry",
+    "it's important to note that", "it is important to note that", "look no further", "take it to the next level", "to the next level", "tapestry",
     "rapidly evolving", "plays a crucial role", "plays a vital role", "whether you're a beginner or", "at the end of the day",
 ]
 
@@ -172,7 +172,7 @@ def check(post: BlogPost, ctx: Ctx) -> tuple[list[dict], int, dict]:
          "Generic phrases make a page sound written by a machine.", "Replace stock phrases with specific, concrete wording."),
         ("unique", "trust", "Different from your earlier pages (under 15% repeated phrases)", top_sim < 0.15, f"{top_sim * 100:.0f}% repeated" if sims else "no earlier pages", bool(sims),
          "Repeating yourself competes with your own pages.", "Choose a different angle and rewrite the repeated parts."),
-        ("sources", "trust", "Cites at least one real source", len(post.sources) >= 1, f"{len(post.sources)} sources", ctx.sources_provided,
+        ("sources", "trust", "Cites at least one real source", len(post.sources) >= 1, f"{len(post.sources)} source{'s' if len(post.sources) != 1 else ''}", ctx.sources_provided,
          "Sources show where facts come from.", "Add the provided sources to the Sources section."),
         ("images", "tech", "At least 3 images, each with descriptive alt text (20+ characters)", len(post.images) >= 3 and all(len(i.alt) >= 20 for i in post.images), f"{len(post.images)} images", True,
          "Images improve the page and alt text helps search and accessibility.", "Add 3 images with alt text that describes each picture."),

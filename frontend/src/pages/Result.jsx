@@ -35,6 +35,13 @@ export default function Result() {
   const [menu, setMenu] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const [sharing, setSharing] = useState(false);
+  useEffect(() => {
+    if (!menu) return undefined;
+    const close = (e) => { if (!e.target.closest?.('.rel')) setMenu(false); };
+    const esc = (e) => e.key === 'Escape' && setMenu(false);
+    document.addEventListener('mousedown', close); document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', esc); };
+  }, [menu]);
   const load = useCallback(() => api(`/api/pages/${id}`).then(setP).catch((e) => setErr(e.message)), [id]);
   useEffect(() => { setP(null); setErr(""); load(); }, [load]);
 
@@ -123,6 +130,7 @@ export default function Result() {
       {tab === "images" && (
         <div className="fade-up card card-pad">
           <h3 style={{ marginBottom: 14 }}><ImageIcon size={18} style={{ verticalAlign: -3 }} /> Images on this page</h3>
+          {p.images.length === 0 && <p className="muted">This page has no images. You can add your own when you publish it.</p>}
           <div className="gallery">{p.images.map((im) => <figure key={im.token}><img src={im.url} alt={im.alt} loading="lazy" /><figcaption>{im.alt}{im.credit && <><br />{im.credit}</>}</figcaption></figure>)}</div>
         </div>
       )}

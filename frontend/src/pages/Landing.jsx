@@ -60,8 +60,8 @@ export default function Landing() {
         <div className="container nav-in">
           <Logo />
           <nav className="nav-links" aria-label="Main">
-            <a className="link" href="#how">How it works</a><a className="link" href="#data">Honest data</a><a className="link" href="#faq">FAQ</a>
-            <ThemeToggle />
+            <a className="link hide-sm" href="#how">How it works</a><a className="link hide-sm" href="#data">Honest data</a><a className="link hide-sm" href="#faq">FAQ</a>
+            <span className="theme-slot"><ThemeToggle /></span>
             {user ? <Link className="btn btn-primary btn-sm" to="/app/new">Open app</Link> : <>
               <Link className="link" to="/login">Sign in</Link><Link className="btn btn-primary btn-sm" to="/signup">Get started</Link></>}
           </nav>

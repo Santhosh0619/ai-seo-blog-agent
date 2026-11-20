@@ -16,7 +16,7 @@ import re
 import time
 
 import httpx
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageStat
 
 from .config import settings
 from .llm import current_key
@@ -53,6 +53,9 @@ def cover(seed: str, w: int = 1280, h: int = 720) -> bytes:
         dr.ellipse((cx - r, cy - r, cx + r, cy + r), fill=col)
     layer = layer.filter(ImageFilter.GaussianBlur(110))
     im = Image.blend(base, layer, 0.92)
+    mean = ImageStat.Stat(im.convert("L")).mean[0]
+    if mean < 105:  # keep covers clearly visible on dark and light pages
+        im = ImageEnhance.Brightness(im).enhance(min(2.4, 105 / max(mean, 1)))
     out = io.BytesIO()
     im.save(out, "WEBP", quality=82)
     return out.getvalue()
