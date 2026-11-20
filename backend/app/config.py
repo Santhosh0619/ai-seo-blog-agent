@@ -37,6 +37,10 @@ class Settings:
     db_password: str = field(default_factory=lambda: _e("POSTGRES_PASSWORD"))
     cors_origins: list[str] = field(default_factory=lambda: [o.strip() for o in _e("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",") if o.strip()])
     public_url: str = field(default_factory=lambda: _e("PUBLIC_URL").rstrip("/"))
+    gmail_client_id: str = field(default_factory=lambda: _e("GMAIL_CLIENT_ID"))
+    gmail_client_secret: str = field(default_factory=lambda: _e("GMAIL_CLIENT_SECRET"))
+    gmail_refresh_token: str = field(default_factory=lambda: _e("GMAIL_REFRESH_TOKEN"))
+    gmail_sender: str = field(default_factory=lambda: _e("GMAIL_SENDER"))
     google_client_id: str = field(default_factory=lambda: _e("GOOGLE_CLIENT_ID"))
     google_client_secret: str = field(default_factory=lambda: _e("GOOGLE_CLIENT_SECRET"))
     free_runs_per_day: int = field(default_factory=lambda: int(_e("FREE_RUNS_PER_DAY", "2")))
@@ -48,6 +52,10 @@ class Settings:
     @property
     def key_configured(self) -> bool:
         return self.gemini_api_key.lower() not in PLACEHOLDERS
+
+    @property
+    def email_enabled(self) -> bool:
+        return bool(self.gmail_client_id and self.gmail_client_secret and self.gmail_refresh_token and self.gmail_sender)
 
     @property
     def google_enabled(self) -> bool:
@@ -69,4 +77,5 @@ def startup_report() -> None:
         log.warning("GEMINI_API_KEY is not set: only users with their own Gemini key can create blogs.")
     else:
         log.info("Shared Gemini key loaded (model=%s).", settings.llm_model)
+    log.info("Password reset email: %s", "on" if settings.email_enabled else "off (set GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, GMAIL_SENDER)")
     log.info("Google sign-in: %s", "on" if settings.google_enabled else "off (set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET)")

@@ -8,3 +8,6 @@ node_modules/
 frontend/dist/
 .pytest_cache/
 *.log
+
+# one-time Gmail authorization output (never commit)
+.gmail_refresh_token

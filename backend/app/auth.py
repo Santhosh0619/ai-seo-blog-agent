@@ -18,9 +18,9 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel
 
-from . import db
+from . import db, mailer
 from .config import settings
-from .errors import (AUTH_REQUIRED, BAD_CREDENTIALS, EMAIL_TAKEN, TOO_MANY, WEAK_INPUT, AppError)
+from .errors import (AUTH_REQUIRED, BAD_CREDENTIALS, BAD_RESET, EMAIL_OFF, EMAIL_TAKEN, TOO_MANY, WEAK_INPUT, AppError)
 
 COOKIE = "sid"
 MAX_AGE = 30 * 24 * 3600
@@ -127,6 +127,60 @@ async def login(c: Creds, request: Request):
     resp = JSONResponse({"user": public_user(user)})
     set_session(resp, request, token)
     return resp
+
+
+# ---- password reset by email ---------------------------------------------------------------------------------
+_pending: set = set()  # keeps fire-and-forget mail tasks alive
+
+
+class Forgot(BaseModel):
+    email: str
+
+
+class Reset(BaseModel):
+    token: str
+    password: str
+
+
+async def _send_reset(user: dict, base: str) -> None:
+    try:
+        if user["password_hash"]:
+            token = await asyncio.to_thread(db.create_reset, user["id"])
+            subject, text, html = mailer.reset_email(f"{base}/reset#t={token}")  # in the #fragment: it never reaches server logs
+        else:
+            subject, text, html = mailer.google_only_email()
+        await mailer.send_mail(user["email"], subject, text, html)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+@router.post("/forgot")
+async def forgot(body: Forgot, request: Request):
+    if not mailer.configured():
+        raise EMAIL_OFF
+    email = body.email.strip().lower()
+    _limit(f"forgot-ip:{client_ip(request)}", 6)
+    _limit(f"forgot-email:{email}", 3)
+    if _EMAIL.match(email):
+        user = await asyncio.to_thread(db.user_by_email, email)
+        if user:  # sent in the background, so the answer is the same (and as fast) whether or not the account exists
+            t = asyncio.create_task(_send_reset(user, public_base(request)))
+            _pending.add(t)
+            t.add_done_callback(_pending.discard)
+    return {"ok": True}
+
+
+@router.post("/reset")
+async def reset(body: Reset, request: Request):
+    _limit(f"reset-ip:{client_ip(request)}", 12)
+    if not (8 <= len(body.password) <= 128):
+        raise WEAK_INPUT
+    uid = await asyncio.to_thread(db.consume_reset, body.token.strip())
+    if uid is None:
+        raise BAD_RESET
+    pw_hash = await asyncio.to_thread(hash_password, body.password)
+    await asyncio.to_thread(db.set_password, uid, pw_hash)
+    return {"ok": True}
 
 
 @router.post("/logout")

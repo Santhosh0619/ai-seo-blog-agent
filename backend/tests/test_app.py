@@ -9,7 +9,7 @@ import uuid
 import pytest
 from fastapi.testclient import TestClient
 
-from app import agent, auth, db, dedupe, errors, images as images_mod, main, research, safeurl, seo
+from app import agent, auth, db, dedupe, errors, images as images_mod, mailer, main, research, safeurl, seo
 from app.config import settings
 from app.llm import current_key
 from app.models import BlogPost, BlogRequest
@@ -455,3 +455,111 @@ async def test_commons_tries_the_topic_when_the_image_query_finds_nothing(monkey
     idea = ImageIdea(description="d", alt="alt text long enough here", placement="hero", query="odd query")
     assert await images_mod._commons(None, idea, "cricket bat for beginners") == (b"img", "credit")
     assert asked == ["odd query", "cricket bat for beginners"]
+
+
+# ---- password reset by email (Gmail API faked) -----------------------------------------------------------------------------------------------
+@pytest.fixture()
+def mail(client, monkeypatch):
+    sent: list[dict] = []
+    for k in ("gmail_client_id", "gmail_client_secret", "gmail_refresh_token", "gmail_sender"):
+        monkeypatch.setattr(settings, k, f"test-{k}")
+
+    async def fake_send(to, subject, text, html):
+        sent.append({"to": to, "subject": subject, "text": text, "html": html})
+        return True
+
+    monkeypatch.setattr(mailer, "send_mail", fake_send)
+    return sent
+
+
+def _wait_mail(sent: list, n: int = 1):
+    import time
+    for _ in range(60):
+        if len(sent) >= n:
+            return
+        time.sleep(0.05)
+
+
+def _token_from(mail_item: dict) -> str:
+    return mail_item["text"].split("#t=")[1].split()[0]
+
+
+def test_reset_flow_end_to_end(client, mail):
+    email = _signup(client)
+    old_cookie = client.cookies.get("sid")
+    assert client.post("/api/auth/forgot", json={"email": email}).json() == {"ok": True}
+    _wait_mail(mail)
+    assert len(mail) == 1 and mail[0]["to"] == email and "Reset your" in mail[0]["subject"]
+    link = [w for w in mail[0]["text"].split() if "#t=" in w][0]
+    assert "/reset#t=" in link, "the token must be in the #fragment so it never reaches server logs"
+    token = _token_from(mail[0])
+    # a too-short password does not use up the token
+    assert client.post("/api/auth/reset", json={"token": token, "password": "short"}).status_code == 422
+    assert client.post("/api/auth/reset", json={"token": token, "password": "A brand new pass 2026"}).status_code == 200
+    # the link works once only
+    assert client.post("/api/auth/reset", json={"token": token, "password": "Another pass 2026!"}).status_code == 400
+    # old password is dead, new one works, old sessions are signed out
+    client.cookies.clear()
+    assert client.post("/api/auth/login", json={"email": email, "password": PW}).status_code == 401
+    assert client.post("/api/auth/login", json={"email": email, "password": "A brand new pass 2026"}).status_code == 200
+    client.cookies.clear()
+    client.cookies.set("sid", old_cookie)
+    assert client.get("/api/auth/me").status_code == 401
+    client.post("/api/auth/login", json={"email": email, "password": "A brand new pass 2026"})
+    _cleanup(client)
+
+
+def test_forgot_does_not_reveal_whether_an_account_exists(client, mail):
+    r1 = client.post("/api/auth/forgot", json={"email": "nobody-" + uuid.uuid4().hex[:6] + "@example.test"})
+    r2 = client.post("/api/auth/forgot", json={"email": "not an email"})
+    assert r1.status_code == 200 and r2.status_code == 200 and r1.json() == r2.json() == {"ok": True}
+    _wait_mail(mail)
+    assert mail == []
+
+
+def test_google_only_account_gets_a_helpful_email_and_no_token(client, mail):
+    email = f"g-{uuid.uuid4().hex[:8]}@example.test"
+    db.create_user(email, "G", None, "google-sub-" + uuid.uuid4().hex)
+    client.post("/api/auth/forgot", json={"email": email})
+    _wait_mail(mail)
+    assert len(mail) == 1 and "Continue with Google" in mail[0]["text"] and "#t=" not in mail[0]["text"]
+    db.delete_user(db.user_by_email(email)["id"])
+
+
+def test_expired_and_unknown_tokens_are_rejected(client, mail):
+    email = _signup(client)
+    client.post("/api/auth/forgot", json={"email": email})
+    _wait_mail(mail)
+    token = _token_from(mail[0])
+    db._run(lambda c: c.execute("UPDATE password_resets SET expires_at = now() - interval '1 minute'"))
+    assert client.post("/api/auth/reset", json={"token": token, "password": "A brand new pass 2026"}).status_code == 400
+    assert client.post("/api/auth/reset", json={"token": "x" * 40, "password": "A brand new pass 2026"}).status_code == 400
+    _cleanup(client)
+
+
+def test_forgot_is_rate_limited(client, mail):
+    email = _signup(client)
+    codes = [client.post("/api/auth/forgot", json={"email": email}).status_code for _ in range(5)]
+    assert codes[:3] == [200, 200, 200] and 429 in codes
+    _cleanup(client)
+
+
+def test_reset_is_off_when_email_is_not_configured(client, monkeypatch):
+    for k in ("gmail_client_id", "gmail_client_secret", "gmail_refresh_token", "gmail_sender"):
+        monkeypatch.setattr(settings, k, "")
+    assert client.get("/api/meta").json()["email_reset"] is False
+    assert client.post("/api/auth/forgot", json={"email": "a@example.test"}).status_code == 503
+
+
+def test_meta_reports_email_reset_when_configured(client, mail):
+    assert client.get("/api/meta").json()["email_reset"] is True
+
+
+def test_mail_message_is_well_formed():
+    from app import mailer as m
+    subject, text, html = m.reset_email("https://x.test/reset#t=abc")
+    msg = m.build_message("a@example.test", subject, text, html)
+    assert msg["To"] == "a@example.test" and msg["Subject"] == subject and "abc" in msg.get_body(("plain",)).get_content()
+    import pytest as _p
+    with _p.raises(Exception):
+        m.build_message("a@example.test\nBcc: evil@example.test", subject, text, html)  # header injection is refused

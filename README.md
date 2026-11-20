@@ -37,6 +37,12 @@ About 3-4 Gemini calls per page. Models fall back automatically (`gemini-3.5-fla
 - A user can export all their data or delete their account (everything cascades).
 - Website field: only public http(s) sites on standard ports; private and loopback addresses are blocked (SSRF protection); read-only GET of robots.txt and sitemaps with size and time limits.
 
+## Password reset email (free, Gmail API)
+"Forgot your password?" sends a single-use link (valid 30 minutes) by email. Mail is sent through the **Gmail API over HTTPS** from the site owner's own Gmail account, so it is authenticated by Google and lands in the inbox, not in spam. It needs no domain and costs nothing (Gmail allows about 500 messages a day).
+- The link carries its token in the `#fragment`, so the token never reaches server logs. Tokens are stored hashed, work once, and a reset signs the user out everywhere.
+- The answer to "forgot password" is identical whether or not the account exists, and requests are rate limited.
+- Setup: create a small Google Cloud project, enable the Gmail API, add the `gmail.send` scope, create a **Desktop app** OAuth client, put `GMAIL_CLIENT_ID` and `GMAIL_CLIENT_SECRET` in `.env`, run `docker compose --profile dev run --rm -p 127.0.0.1:8765:8765 app python scripts/gmail_authorize.py` once, then set `GMAIL_REFRESH_TOKEN` and `GMAIL_SENDER` in the Render environment. Without these variables the feature switches itself off and the login page shows a hint instead.
+
 ## Run locally
 Requirements: Docker Desktop, Node 18+ (Python is only needed inside Docker).
 
@@ -60,6 +66,7 @@ docker compose --profile dev run --rm app pytest -q
 | `FREE_RUNS_PER_DAY`, `GLOBAL_FREE_RUNS_PER_DAY` | Free runs per user (rolling 24 h) and in total |
 | `PUBLIC_URL` | Public address, used for share links and Google redirect (derived from headers if unset) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Enable Google sign-in. Redirect URI: `<PUBLIC_URL>/api/auth/google/callback` |
+| `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`, `GMAIL_SENDER` | Enable password reset by email (see above) |
 | `PIXABAY_API_KEY` | Optional free key (pixabay.com/api/docs) for more stock photos. Without it, photos come from Wikimedia Commons |
 
 ## Deploy (free): Render + Neon
@@ -69,5 +76,5 @@ docker compose --profile dev run --rm app pytest -q
 - Search volume and competition are AI estimates: there is no free official source. They are labelled, never shown as exact numbers.
 - Free Gemini models are sometimes busy; the agent retries other models, and a run can still occasionally fail with a clear message.
 - Gemini image generation is not in the free tier, so free runs use openly licensed photos or generated covers.
-- No password reset by email yet (free hosting blocks SMTP); Google sign-in avoids the need.
+- Email goes through your own Gmail account (about 500 a day), because free hosting blocks SMTP and a sending domain costs money.
 - Review every page before publishing. Nothing here guarantees a ranking.

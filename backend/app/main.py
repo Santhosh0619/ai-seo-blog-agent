@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import auth, db, page, safeurl
+from . import auth, db, mailer, page, safeurl
 from .agent import run_agent
 from .auth import current_user, public_base
 from .config import PRODUCT_NAME, ROOT, settings, startup_report
@@ -23,14 +23,14 @@ from .llm import current_key, run_key
 from .models import BlogRequest
 
 # Anything that looks like an API key is redacted from every log line, whatever the source.
-_KEYLIKE = re.compile(r"(AIza[0-9A-Za-z_\-]{20,}|AQ\.[0-9A-Za-z_\-]{20,}|postgres(?:ql)?://\S+)")
+_KEYLIKE = re.compile(r"(AIza[0-9A-Za-z_\-]{20,}|AQ\.[0-9A-Za-z_\-]{20,}|GOCSPX-[0-9A-Za-z_\-]{10,}|1//[0-9A-Za-z_\-]{20,}|postgres(?:ql)?://\S+)")
 
 
 class _Redact(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         msg = record.getMessage()
         red = _KEYLIKE.sub("[REDACTED]", msg)
-        for s in (settings.gemini_api_key, settings.db_password, current_key()):
+        for s in (settings.gemini_api_key, settings.db_password, settings.gmail_client_secret, settings.gmail_refresh_token, current_key()):
             if s and len(s) >= 8:
                 red = red.replace(s, "[REDACTED]")
         if red != msg:
@@ -105,7 +105,7 @@ async def health():
 
 @app.get("/api/meta")
 async def meta():
-    return {"product": PRODUCT_NAME, "google": settings.google_enabled, "free_runs_per_day": settings.free_runs_per_day, "model": settings.llm_model}
+    return {"product": PRODUCT_NAME, "google": settings.google_enabled, "email_reset": mailer.configured(), "free_runs_per_day": settings.free_runs_per_day, "model": settings.llm_model}
 
 
 @app.get("/api/quota")

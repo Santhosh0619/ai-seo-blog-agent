@@ -30,6 +30,12 @@ CREATE TABLE IF NOT EXISTS sessions (
   expires_at TIMESTAMPTZ NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS password_resets (
+  token_hash TEXT PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 CREATE TABLE IF NOT EXISTS pages (
   id BIGSERIAL PRIMARY KEY,
   user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -173,6 +179,32 @@ def session_user(token: str) -> dict | None:
 
 def delete_session(token: str) -> None:
     _run(lambda c: c.execute("DELETE FROM sessions WHERE token_hash = %s", (_h(token),)))
+
+
+# ---- password reset (single-use, short-lived tokens; only a hash is stored) -----------------------------------
+def create_reset(user_id: int, minutes: int = 30) -> str:
+    token = secrets.token_urlsafe(32)
+
+    def fn(c):
+        c.execute("DELETE FROM password_resets WHERE user_id = %s OR expires_at < now()", (user_id,))
+        c.execute("INSERT INTO password_resets (token_hash, user_id, expires_at) VALUES (%s,%s,%s)",
+                  (_h(token), user_id, datetime.now(timezone.utc) + timedelta(minutes=minutes)))
+    _run(fn)
+    return token
+
+
+def consume_reset(token: str) -> int | None:
+    """Atomically use a reset token. Returns the user id, or None if it is unknown, used or expired."""
+    r = _run(lambda c: c.execute("DELETE FROM password_resets WHERE token_hash = %s AND expires_at > now() RETURNING user_id", (_h(token),)).fetchone())
+    return r[0] if r else None
+
+
+def set_password(user_id: int, password_hash: str) -> None:
+    def fn(c):
+        c.execute("UPDATE users SET password_hash = %s WHERE id = %s", (password_hash, user_id))
+        c.execute("DELETE FROM sessions WHERE user_id = %s", (user_id,))  # sign out everywhere
+        c.execute("DELETE FROM password_resets WHERE user_id = %s", (user_id,))
+    _run(fn)
 
 
 # ---- runs and free quota -------------------------------------------------------------------------
