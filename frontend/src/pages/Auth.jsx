@@ -57,6 +57,11 @@ export default function Auth({ mode }) {
           </div>
           <button className="btn btn-primary btn-lg btn-block" disabled={busy || !form.email || form.password.length < 1}>{busy ? <Loader2 size={18} className="spin-i" style={{ animation: "spin 1s linear infinite" }} /> : null}{signup ? "Create account" : "Sign in"}</button>
         </form>
+        {!signup && (
+          <p className="hint" style={{ marginTop: 14 }}>
+            Forgot your password? There is no email reset yet. {meta.google ? <>Use <b>Continue with Google</b> with the same email address and you will get into your existing account.</> : "Create a new account, or contact the site owner."}
+          </p>
+        )}
         <p className="muted" style={{ marginTop: 20, fontSize: 14 }}>
           {signup ? <>Already have an account? <Link to={`/login${topic ? `?topic=${encodeURIComponent(topic)}` : ""}`}>Sign in</Link></> : <>New here? <Link to={`/signup${topic ? `?topic=${encodeURIComponent(topic)}` : ""}`}>Create an account</Link></>}
         </p>

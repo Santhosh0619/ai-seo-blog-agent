@@ -2,9 +2,10 @@
 
  1. Gemini image generation with the run's key. Free keys have no image quota (checked: HTTP 429), so this only
     works for users whose own key allows it. A failure disables it for that key (6 h for quota/billing, 5 min otherwise).
- 2. Pexels stock photos (optional free key, photographer credit shown)
+ 2. Pexels / Pixabay stock photos (optional free keys; Pexels has paused new keys, Pixabay still issues them)
  3. Wikimedia Commons: openly licensed photos (CC BY, CC BY-SA, CC0, public domain) with credit. No key needed.
  4. A generated abstract cover (always works)
+ (Openverse was tried and dropped: Flickr and StockSnap block downloads from servers and its image proxy times out.)
 """
 import asyncio
 import base64
@@ -105,8 +106,20 @@ def _plain(html: str) -> str:
 
 
 async def _commons(client: httpx.AsyncClient, idea: ImageIdea, topic: str) -> tuple[bytes, str] | None:
-    """Openly licensed photo from Wikimedia Commons with a proper credit line."""
-    query = (idea.query or topic)[:80]
+    """Openly licensed photo from Wikimedia Commons. Tries the image's own query, then the topic, then its first two words."""
+    seen: list[str] = []
+    for q in (idea.query, topic, " ".join(topic.split()[:2])):
+        q = (q or "").strip()[:80]
+        if q and q.lower() not in seen:
+            seen.append(q.lower())
+            found = await _commons_search(client, q)
+            if found:
+                return found
+    return None
+
+
+async def _commons_search(client: httpx.AsyncClient, query: str) -> tuple[bytes, str] | None:
+    """One Wikimedia Commons search, with a proper credit line."""
     words = [w for w in re.findall(r"[a-z]{4,}", query.lower())]
     try:
         r = await client.get("https://commons.wikimedia.org/w/api.php", headers={"User-Agent": _UA}, timeout=8, params={
@@ -135,6 +148,39 @@ async def _commons(client: httpx.AsyncClient, idea: ImageIdea, topic: str) -> tu
     return None
 
 
+async def _download(client: httpx.AsyncClient, url: str, max_bytes: int = 8_000_000) -> bytes | None:
+    async with client.stream("GET", url, headers={"User-Agent": _UA}, timeout=15) as r:
+        if r.status_code != 200:
+            return None
+        buf = bytearray()
+        async for chunk in r.aiter_bytes():
+            buf += chunk
+            if len(buf) > max_bytes:
+                return None
+        return bytes(buf)
+
+
+async def _pixabay(client: httpx.AsyncClient, idea: ImageIdea, topic: str) -> tuple[bytes, str] | None:
+    """Optional: free Pixabay key. Images are downloaded into our own storage (their terms forbid hotlinking)."""
+    if not settings.pixabay_api_key:
+        return None
+    try:
+        r = await client.get("https://pixabay.com/api/", timeout=8, params={
+            "key": settings.pixabay_api_key, "q": (idea.query or topic)[:100], "image_type": "photo", "orientation": "horizontal",
+            "safesearch": "true", "per_page": 5, "min_width": 1000})
+        r.raise_for_status()
+        hits = r.json().get("hits") or []
+        if not hits:
+            return None
+        h = hits[0]
+        raw = await _download(client, h.get("largeImageURL") or h["webformatURL"])
+        if not raw:
+            return None
+        return await asyncio.to_thread(_to_webp, raw), f"Image by {h.get('user', 'a contributor')} from Pixabay"
+    except Exception:  # noqa: BLE001
+        return None
+
+
 async def make_images(ideas: list[ImageIdea], topic: str) -> list[dict]:
     """One image per idea (max 3). Returns [{idx, mime, data, alt, credit, source}]."""
     async with httpx.AsyncClient(follow_redirects=True) as client:
@@ -145,6 +191,9 @@ async def make_images(ideas: list[ImageIdea], topic: str) -> list[dict]:
             ph = await _pexels(client, idea, topic)
             if ph:
                 return {"idx": i, "mime": "image/webp", "data": ph[0], "alt": idea.alt, "credit": ph[1], "source": "pexels"}
+            px = await _pixabay(client, idea, topic)
+            if px:
+                return {"idx": i, "mime": "image/webp", "data": px[0], "alt": idea.alt, "credit": px[1], "source": "pixabay"}
             cm = await _commons(client, idea, topic)
             if cm:
                 return {"idx": i, "mime": "image/webp", "data": cm[0], "alt": idea.alt, "credit": cm[1], "source": "commons"}

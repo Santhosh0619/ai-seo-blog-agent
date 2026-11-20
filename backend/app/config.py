@@ -28,6 +28,7 @@ class Settings:
     image_model: str = field(default_factory=lambda: _e("IMAGE_MODEL", "gemini-2.5-flash-image"))
     images_enabled: bool = field(default_factory=lambda: _e("IMAGES_ENABLED", "true").lower() != "false")
     pexels_api_key: str = field(default_factory=lambda: _e("PEXELS_API_KEY"))
+    pixabay_api_key: str = field(default_factory=lambda: _e("PIXABAY_API_KEY"))
     database_url: str = field(default_factory=lambda: _e("DATABASE_URL"))
     db_host: str = field(default_factory=lambda: _e("DB_HOST", "127.0.0.1"))
     db_port: str = field(default_factory=lambda: _e("DB_PORT", "5434"))

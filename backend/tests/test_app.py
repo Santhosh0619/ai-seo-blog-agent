@@ -26,6 +26,7 @@ def client(monkeypatch):
     monkeypatch.setattr(research, "run_research", fakes.fake_research)
     monkeypatch.setattr(images_mod, "_gemini", _none)
     monkeypatch.setattr(images_mod, "_commons", _none2)
+    monkeypatch.setattr(images_mod, "_pixabay", _none2)
     monkeypatch.setattr(agent, "structured", fakes.fake_llm())
     with TestClient(main.app) as c:
         yield c
@@ -378,6 +379,7 @@ async def test_cover_images_always_work(monkeypatch):
     from app.models import ImageIdea
     monkeypatch.setattr(images_mod, "_gemini", _none)
     monkeypatch.setattr(images_mod, "_commons", _none2)
+    monkeypatch.setattr(images_mod, "_pixabay", _none2)
     out = await images_mod.make_images([ImageIdea(description="a bat", alt="a bat on grass for testing", placement="hero", query="bat")] * 2, "cricket")
     assert len(out) == 2 and all(o["source"] == "cover" and o["data"][:4] == b"RIFF" for o in out)
 
@@ -419,3 +421,37 @@ async def test_failed_models_are_skipped_next_time_and_bad_key_stops(monkeypatch
         await llm.structured(dict, "s", "u")
     assert e.value.code == "INVALID_API_KEY"
     llm._bad.clear()
+
+
+async def test_image_sources_are_tried_in_order_and_fall_back(monkeypatch):
+    from app.models import ImageIdea
+    idea = ImageIdea(description="a bat", alt="a bat on grass for testing", placement="hero", query="bat")
+    jpg = images_mod.cover("x")
+    calls: list[str] = []
+
+    def provider(name, result):
+        async def f(*a, **k):
+            calls.append(name)
+            return result
+        return f
+
+    monkeypatch.setattr(images_mod, "_gemini", provider("gemini", None))
+    monkeypatch.setattr(images_mod, "_pixabay", provider("pixabay", None))
+    monkeypatch.setattr(images_mod, "_commons", provider("commons", (jpg, "Photo: A / Wikimedia Commons (CC BY 4.0)")))
+    out = (await images_mod.make_images([idea], "cricket"))[0]
+    assert calls == ["gemini", "pixabay", "commons"]
+    assert out["source"] == "commons" and "Wikimedia" in out["credit"]
+
+
+async def test_commons_tries_the_topic_when_the_image_query_finds_nothing(monkeypatch):
+    from app.models import ImageIdea
+    asked: list[str] = []
+
+    async def search(client, query):
+        asked.append(query)
+        return (b"img", "credit") if query == "cricket bat for beginners" else None
+
+    monkeypatch.setattr(images_mod, "_commons_search", search)
+    idea = ImageIdea(description="d", alt="alt text long enough here", placement="hero", query="odd query")
+    assert await images_mod._commons(None, idea, "cricket bat for beginners") == (b"img", "credit")
+    assert asked == ["odd query", "cricket bat for beginners"]

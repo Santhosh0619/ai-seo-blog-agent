@@ -22,7 +22,7 @@ React (Vite) --SSE--> FastAPI --> LangGraph agent --> Gemini (structured output)
 | 3 Duplicate check | Word overlap of every keyword with your site's pages and your earlier pages: `gap` / `partial` / `conflict`. Deterministic, free, explainable | Verified (computed) |
 | 4 Plan (AI) | Main + side keywords, a unique angle, slug, audience, intent, H1/H2/H3 outline | Volume, competition, intent are **AI estimates** (low / medium / high, never invented numbers) |
 | 5 Write (AI) | Title, meta, article, key takeaways, FAQs, image ideas, sources, next-step box. Rules: no invented statistics, no stock AI phrases | |
-| 6 Images | Gemini image generation if the key allows it, else openly licensed photos (Pexels with a key, otherwise Wikimedia Commons) with credit, else a generated cover | |
+| 6 Images | Gemini image generation if the key allows it, else openly licensed photos with credit (Pixabay if a key is set, then Wikimedia Commons), else a generated cover | |
 | 7 Validate | **22 code-based SEO checks** in 4 groups (on-page, content, trust and originality, technical), each with "why it matters" and "how to fix". Score 0-100 | |
 | 8 Repair | Only if checks fail: one targeted repair call, then validate again | |
 | 9 Save | Page, checks, research and images saved to your account | |
@@ -60,7 +60,7 @@ docker compose --profile dev run --rm app pytest -q
 | `FREE_RUNS_PER_DAY`, `GLOBAL_FREE_RUNS_PER_DAY` | Free runs per user (rolling 24 h) and in total |
 | `PUBLIC_URL` | Public address, used for share links and Google redirect (derived from headers if unset) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Enable Google sign-in. Redirect URI: `<PUBLIC_URL>/api/auth/google/callback` |
-| `PEXELS_API_KEY` | Optional free key for better stock photos |
+| `PIXABAY_API_KEY` | Optional free key (pixabay.com/api/docs) for more stock photos. Without it, photos come from Wikimedia Commons |
 
 ## Deploy (free): Render + Neon
 `Dockerfile` and `render.yaml` are included. Create a free Neon database, then set `DATABASE_URL` (with `sslmode=require`) and `GEMINI_API_KEY` in the Render service. The database tables are created on start. The free Render instance sleeps when idle.
